@@ -68,3 +68,61 @@ def test_remove_protein_cleans_derived_tokens(seed_network):
     )
     mutator.remove_protein(network, "STAT3")
     assert all("STAT3" not in " ".join([*r.reactants, *r.products]) for r in network.rules)
+
+def test_synthesis_and_degradation(seed_network):
+    mutator = GraphMutator(random.Random(10))
+    network = seed_network.copy()
+    mutator.add_synthesis_rule(network, "STAT3")
+    mutator.add_degradation_rule(network, "SOCS3")
+
+    syn_rules = [r for r in network.rules if r.rule_type == "synthesis"]
+    deg_rules = [r for r in network.rules if r.rule_type == "degradation"]
+
+    assert len(syn_rules) == 1
+    assert not syn_rules[0].reactants
+    assert syn_rules[0].products == ["STAT3"]
+
+    assert len(deg_rules) == 1
+    assert deg_rules[0].reactants == ["SOCS3"]
+    assert not deg_rules[0].products
+
+    # Should not raise validation error
+    network.validate()
+
+def test_activation_and_dephosphorylation(seed_network):
+    mutator = GraphMutator(random.Random(11))
+    network = seed_network.copy()
+    mutator.add_activation_rule(network, "SOCS3", "STAT3")
+    mutator.add_dephosphorylation_rule(network, "SOCS3", "STAT3")
+
+    act_rules = [r for r in network.rules if r.rule_type == "activation"]
+    dephos_rules = [r for r in network.rules if r.rule_type == "dephosphorylation"]
+
+    assert len(act_rules) == 1
+    assert "STAT3_act" in act_rules[0].products
+
+    assert len(dephos_rules) == 1
+    assert "STAT3_P" in dephos_rules[0].reactants
+    assert "STAT3" in dephos_rules[0].products
+
+    network.validate()
+
+def test_graph_motifs(seed_network):
+    mutator = GraphMutator(random.Random(12))
+    network = seed_network.copy()
+    mutator.add_protein(network, "P1")
+    mutator.add_protein(network, "P2")
+    mutator.add_protein(network, "P3")
+
+    mutator.add_feedback_loop(network, "P1", "P2")
+    rules_fl = [r for r in network.rules if r.rule_type in ("activation", "inhibition")]
+    # Should have P1 activates P2, P2 inhibits P1
+    assert any(r.rule_type == "activation" and r.reactants == ["P1", "P2"] for r in rules_fl)
+    assert any(r.rule_type == "inhibition" and r.reactants == ["P2", "P1"] for r in rules_fl)
+
+    mutator.add_feedforward_loop(network, "P1", "P2", "P3")
+    act_rules = [r for r in network.rules if r.rule_type == "activation"]
+    assert any(r.reactants == ["P1", "P3"] for r in act_rules)
+    assert any(r.reactants == ["P2", "P3"] for r in act_rules)
+
+    network.validate()
