@@ -18,6 +18,7 @@ use base qw(Scoring);
     use Carp;
     use Utils;
     use Globals qw($verbosity $TAG);
+    use List::Util qw(any);
 
     use Stimulus;
 
@@ -237,11 +238,11 @@ use base qw(Scoring);
             $connectivity_score += ($lg_subnet_size + $tg_subnet_size);
 
             # score -- LG/TG connected to each other
-            if (grep /LG/, (map {$_->get_name()} @tg_subnet)) {
+            if (any { $_->get_name() =~ /LG/ } @tg_subnet) {
                 printn "LG and TG are connected to each other" if $verbosity >= 1;
                 $connectivity_score += 100;
             }
-            if (grep /TG/, (map {$_->get_name()} @lg_subnet)) {
+            if (any { $_->get_name() =~ /TG/ } @lg_subnet) {
                 printn "TG and LG are connected to each other" if $verbosity >= 1;
                 $connectivity_score += 100;
             }

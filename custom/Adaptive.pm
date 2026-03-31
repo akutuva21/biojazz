@@ -26,6 +26,7 @@ use base qw(Scoring);
     use Carp;
     use Utils;
     use Globals qw($verbosity $TAG);
+    use List::Util qw(any);
 
     use Stimulus;
 
@@ -308,11 +309,11 @@ use base qw(Scoring);
 
                 #########################################################################################
                 # score -- LG/TG connected to each other
-                if (grep /LG/, (map {$_->get_name()} @tg_subnet)) {
+                if (any { $_->get_name() =~ /LG/ } @tg_subnet) {
                     printn "TG0000 fans out to LG0000" if $verbosity > 1;
                     $network_connectivity += 100;
                 }
-                if (grep /TG/, (map {$_->get_name()} @lg_subnet)) {
+                if (any { $_->get_name() =~ /TG/ } @lg_subnet) {
                     printn "LG0000 fans out to TG0000" if $verbosity > 1;
                     $network_connectivity += 100;
                 }

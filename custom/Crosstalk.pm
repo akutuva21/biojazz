@@ -32,6 +32,7 @@ use base qw(Scoring);
     use Carp;
     use Utils;
     use Globals qw($verbosity $TAG);
+    use List::Util qw(any);
 
     use Stimulus;
 
@@ -430,11 +431,11 @@ use base qw(Scoring);
 
                 #########################################################################################
                 # score -- LG/TG connected to each other
-                if (grep /L0G/, (map {$_->get_name()} @t0g_subnet)) {
+                if (any { $_->get_name() =~ /L0G/ } @t0g_subnet) {
                     printn "T0G0000 fans out to L0G0000" if $verbosity > 1;
                     $network_connectivity += 100;
                 }
-                if (grep /T0G/, (map {$_->get_name()} @l0g_subnet)) {
+                if (any { $_->get_name() =~ /T0G/ } @l0g_subnet) {
                     printn "L0G0000 fans out to T0G0000" if $verbosity > 1;
                     $network_connectivity += 100;
                 }
@@ -445,11 +446,11 @@ use base qw(Scoring);
                     $network_connectivity += 100;
                 }
 
-                if (grep /L1G/, (map {$_->get_name()} @t1g_subnet)) {
+                if (any { $_->get_name() =~ /L1G/ } @t1g_subnet) {
                     printn "T1G0000 fans out to L1G0000" if $verbosity > 1;
                     $network_connectivity += 100;
                 }
-                if (grep /T1G/, (map {$_->get_name()} @l1g_subnet)) {
+                if (any { $_->get_name() =~ /T1G/ } @l1g_subnet) {
                     printn "L1G0000 fans out to T1G0000" if $verbosity > 1;
                     $network_connectivity += 100;
                 }
