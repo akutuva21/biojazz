@@ -26,7 +26,7 @@ class Protein:
 @dataclass
 class Rule:
     name: str
-    rule_type: str  # binding | phosphorylation | inhibition
+    rule_type: str  # binding | phosphorylation | dephosphorylation | activation | inhibition | synthesis | degradation
     reactants: List[str]
     products: List[str]
     rate: float
@@ -79,9 +79,9 @@ class ReactionNetwork:
                     )
 
         for idx, rule in enumerate(self.rules):
-            if not rule.reactants:
+            if not rule.reactants and rule.rule_type != "synthesis":
                 raise ReactionNetworkValidationError(f"Rule at index {idx} has no reactants.")
-            if not rule.products:
+            if not rule.products and rule.rule_type != "degradation":
                 raise ReactionNetworkValidationError(f"Rule at index {idx} has no products.")
             if rule.rate < 0:
                 raise ReactionNetworkValidationError(f"Rule '{rule.name}' has negative rate {rule.rate}.")

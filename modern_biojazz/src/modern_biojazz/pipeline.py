@@ -63,6 +63,8 @@ class ModernBioJazzPipeline:
                 return True
             if token.endswith("_inh") and token[:-4] in allowed_symbols:
                 return True
+            if token.endswith("_act") and token[:-4] in allowed_symbols:
+                return True
             if ":" in token:
                 parts = token.split(":")
                 return all(part in allowed_symbols for part in parts)

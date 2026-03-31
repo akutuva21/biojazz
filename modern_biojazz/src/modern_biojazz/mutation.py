@@ -44,7 +44,7 @@ class GraphMutator:
     def _token_references_protein(self, token: str, protein_name: str) -> bool:
         if token == protein_name:
             return True
-        if token == f"{protein_name}_P" or token == f"{protein_name}_inh":
+        if token == f"{protein_name}_P" or token == f"{protein_name}_inh" or token == f"{protein_name}_act":
             return True
         if ":" in token and protein_name in token.split(":"):
             return True
@@ -108,6 +108,68 @@ class GraphMutator:
             )
         )
 
+
+    def add_dephosphorylation_rule(self, network: ReactionNetwork, phosphatase: str, substrate: str, rate: float = 0.2) -> None:
+        if phosphatase not in network.proteins or substrate not in network.proteins:
+            return
+        rname = f"dephos_{phosphatase}_{substrate}_{len(network.rules)+1}"
+        phospho = f"{substrate}_P"
+        self._add_species_if_missing(network, phospho)
+        network.rules.append(
+            Rule(
+                name=rname,
+                rule_type="dephosphorylation",
+                reactants=[phosphatase, phospho],
+                products=[phosphatase, substrate],
+                rate=rate,
+            )
+        )
+
+    def add_activation_rule(self, network: ReactionNetwork, activator: str, target: str, rate: float = 0.2) -> None:
+        if activator not in network.proteins or target not in network.proteins:
+            return
+        rname = f"act_{activator}_{target}_{len(network.rules)+1}"
+        activated = f"{target}_act"
+        self._add_species_if_missing(network, activated)
+        network.rules.append(
+            Rule(
+                name=rname,
+                rule_type="activation",
+                reactants=[activator, target],
+                products=[activator, activated],
+                rate=rate,
+            )
+        )
+
+    def add_synthesis_rule(self, network: ReactionNetwork, protein: str, rate: float = 0.1) -> None:
+        if protein not in network.proteins:
+            return
+        rname = f"syn_{protein}_{len(network.rules)+1}"
+        self._add_species_if_missing(network, protein)
+        network.rules.append(
+            Rule(
+                name=rname,
+                rule_type="synthesis",
+                reactants=[],
+                products=[protein],
+                rate=rate,
+            )
+        )
+
+    def add_degradation_rule(self, network: ReactionNetwork, protein: str, rate: float = 0.1) -> None:
+        if protein not in network.proteins:
+            return
+        rname = f"deg_{protein}_{len(network.rules)+1}"
+        self._add_species_if_missing(network, protein)
+        network.rules.append(
+            Rule(
+                name=rname,
+                rule_type="degradation",
+                reactants=[protein],
+                products=[],
+                rate=rate,
+            )
+        )
     def add_inhibition_rule(self, network: ReactionNetwork, inhibitor: str, target: str, rate: float = 0.05) -> None:
         if inhibitor not in network.proteins or target not in network.proteins:
             return
@@ -124,6 +186,20 @@ class GraphMutator:
             )
         )
 
+    def add_feedback_loop(self, network: ReactionNetwork, a: str, b: str, rate: float = 0.2) -> None:
+        if a not in network.proteins or b not in network.proteins:
+            return
+        # A activates/phosphorylates B, B inhibits A
+        self.add_activation_rule(network, a, b, rate)
+        self.add_inhibition_rule(network, b, a, rate)
+
+    def add_feedforward_loop(self, network: ReactionNetwork, a: str, b: str, c: str, rate: float = 0.2) -> None:
+        if a not in network.proteins or b not in network.proteins or c not in network.proteins:
+            return
+        # A activates B, A activates C, B activates C
+        self.add_activation_rule(network, a, b, rate)
+        self.add_activation_rule(network, a, c, rate)
+        self.add_activation_rule(network, b, c, rate)
     def remove_rule(self, network: ReactionNetwork, rule_name: str) -> None:
         network.rules = [r for r in network.rules if r.name != rule_name]
 
@@ -197,6 +273,33 @@ class GraphMutator:
             k, s = self.rng.sample(names, 2)
             self.add_phosphorylation_rule(net, k, s)
 
+        def random_dephos(net: ReactionNetwork) -> None:
+            if len(net.proteins) < 2:
+                self.add_protein(net)
+                self.add_protein(net)
+            names = list(net.proteins.keys())
+            p, s = self.rng.sample(names, 2)
+            self.add_dephosphorylation_rule(net, p, s)
+
+        def random_activate(net: ReactionNetwork) -> None:
+            if len(net.proteins) < 2:
+                self.add_protein(net)
+                self.add_protein(net)
+            names = list(net.proteins.keys())
+            a, t = self.rng.sample(names, 2)
+            self.add_activation_rule(net, a, t)
+
+        def random_synthesis(net: ReactionNetwork) -> None:
+            if not net.proteins:
+                self.add_protein(net)
+            target = self.rng.choice(list(net.proteins.keys()))
+            self.add_synthesis_rule(net, target)
+
+        def random_degradation(net: ReactionNetwork) -> None:
+            if not net.proteins:
+                self.add_protein(net)
+            target = self.rng.choice(list(net.proteins.keys()))
+            self.add_degradation_rule(net, target)
         def random_inhibit(net: ReactionNetwork) -> None:
             if len(net.proteins) < 2:
                 self.add_protein(net)
@@ -211,6 +314,21 @@ class GraphMutator:
             target = self.rng.choice(net.rules)
             self.remove_rule(net, target.name)
 
+        def random_feedback_loop(net: ReactionNetwork) -> None:
+            if len(net.proteins) < 2:
+                self.add_protein(net)
+                self.add_protein(net)
+            names = list(net.proteins.keys())
+            a, b = self.rng.sample(names, 2)
+            self.add_feedback_loop(net, a, b)
+
+        def random_feedforward_loop(net: ReactionNetwork) -> None:
+            if len(net.proteins) < 3:
+                for _ in range(3 - len(net.proteins)):
+                    self.add_protein(net)
+            names = list(net.proteins.keys())
+            a, b, c = self.rng.sample(names, 3)
+            self.add_feedforward_loop(net, a, b, c)
         def random_modify_rate(net: ReactionNetwork) -> None:
             if not net.rules:
                 return
@@ -248,4 +366,10 @@ class GraphMutator:
             "remove_site": MutationAction("remove_site", random_remove_site),
             "duplicate_protein": MutationAction("duplicate_protein", random_duplicate),
             "remove_protein": MutationAction("remove_protein", random_remove_protein),
+            "add_dephosphorylation": MutationAction("add_dephosphorylation", random_dephos),
+            "add_activation": MutationAction("add_activation", random_activate),
+            "add_synthesis": MutationAction("add_synthesis", random_synthesis),
+            "add_degradation": MutationAction("add_degradation", random_degradation),
+            "add_feedback_loop": MutationAction("add_feedback_loop", random_feedback_loop),
+            "add_feedforward_loop": MutationAction("add_feedforward_loop", random_feedforward_loop),
         }
