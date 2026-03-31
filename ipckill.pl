@@ -7,7 +7,7 @@ use warnings;
 my $username = `whoami`;
 chomp $username;
 
-open(FH, "ipcs -s |");
+open(FH, "-|", "ipcs", "-s");
 
 while (<FH>) {
     my $line = $_;
@@ -15,13 +15,13 @@ while (<FH>) {
     if ($line =~ /\S+\s*(\S+)\s*$username/) {
         my $id = $1;
         print "found user sema $line\n";
-        system ("./ipckill_c 0 $id");
+        system ("./ipckill_c", "0", $id);
     }
 }
 
 close(FH);
 
-open(FH, "ipcs -m |");
+open(FH, "-|", "ipcs", "-m");
 
 while (<FH>) {
     my $line = $_;
@@ -29,7 +29,7 @@ while (<FH>) {
     if ($line =~ /\S+\s*(\S+)\s*$username/) {
         my $id = $1;
         print "found user shmem $line\n";
-        system ("./ipckill_c 1 $id");
+        system ("./ipckill_c", "1", $id);
     }
 }
 
