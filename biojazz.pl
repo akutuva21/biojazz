@@ -53,6 +53,7 @@ use warnings;
 #######################################################################################
 use Getopt::Long;
 use English;			# Use english names for global system variables
+use Text::ParseWords;
 
 use 5.008_000;            # require perl version 5.8.0 or higher
 use Class::Std 0.0.8;     # require Class::Std version 0.0.8 or higher
@@ -198,7 +199,37 @@ rescore_genomes() if $RESCORE && defined $config_ref->{config_file};
 
 
 if (defined $COMMAND) {
-    eval("$COMMAND");  warn if $@;
+    if ($COMMAND =~ /^\s*([a-zA-Z0-9_]+)\s*\((.*?)\)\s*;?\s*$/) {
+        my $func = $1;
+        my $args_str = $2;
+
+        my %allowed_funcs = map { $_ => 1 } qw(
+            create_workspace
+            evolve
+            load_genome
+            save_genome
+            score_genome
+            score_generation
+            rescore_genomes
+            collect_history_from_genomes
+            collect_history_from_logfile
+            collect_info_from_networks
+        );
+
+        if ($allowed_funcs{$func}) {
+            my @args;
+            if ($args_str !~ /^\s*$/) {
+                @args = Text::ParseWords::parse_line(',', 0, $args_str);
+                @args = map { defined $_ ? do { s/^\s+//; s/\s+$//; $_ } : '' } @args;
+            }
+            no strict 'refs';
+            &{"main::$func"}(@args);
+        } else {
+            warn "Command function '$func' is not allowed or unrecognized.\n";
+        }
+    } else {
+        warn "Command format not recognized. Must be 'function(args)'.\n";
+    }
 }
 
 if (defined $SCRIPT) {
