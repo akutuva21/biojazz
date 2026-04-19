@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import random
 from dataclasses import dataclass
-from typing import Callable, Dict
+from typing import Callable, Dict, Union
 
 from .site_graph import ReactionNetwork, Protein, Site, Rule
 
@@ -203,12 +203,16 @@ class GraphMutator:
     def remove_rule(self, network: ReactionNetwork, rule_name: str) -> None:
         network.rules = [r for r in network.rules if r.name != rule_name]
 
-    def modify_rate(self, network: ReactionNetwork, rule_name: str, multiplier: float) -> None:
-        for r in network.rules:
-            if r.name == rule_name:
-                new_rate = r.rate * multiplier
-                r.rate = min(100.0, max(1e-6, new_rate))
-                return
+    def modify_rate(self, network: ReactionNetwork, rule_or_name: Union[Rule, str], multiplier: float) -> None:
+        if isinstance(rule_or_name, Rule):
+            new_rate = rule_or_name.rate * multiplier
+            rule_or_name.rate = min(100.0, max(1e-6, new_rate))
+        else:
+            for r in network.rules:
+                if r.name == rule_or_name:
+                    new_rate = r.rate * multiplier
+                    r.rate = min(100.0, max(1e-6, new_rate))
+                    return
 
     def duplicate_protein_with_rewiring(self, network: ReactionNetwork, protein_name: str) -> None:
         if protein_name not in network.proteins:
@@ -335,7 +339,7 @@ class GraphMutator:
             target = self.rng.choice(net.rules)
             # Log-uniform jitter around 1.0 keeps multiplicative updates stable.
             multiplier = 10 ** self.rng.uniform(-0.2, 0.2)
-            self.modify_rate(net, target.name, multiplier)
+            self.modify_rate(net, target, multiplier)
 
         def random_remove_site(net: ReactionNetwork) -> None:
             candidates = [(p.name, s.name) for p in net.proteins.values() for s in p.sites]
