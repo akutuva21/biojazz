@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import math
+import ssl
 import time
 import urllib.request
 from dataclasses import dataclass
@@ -67,7 +68,7 @@ class CatalystHTTPClient:
                     headers={"Content-Type": "application/json"},
                     method="POST",
                 )
-                with urllib.request.urlopen(req, timeout=self.timeout_seconds) as response:
+                with urllib.request.urlopen(req, timeout=self.timeout_seconds, context=ssl.create_default_context()) as response:
                     status = getattr(response, "status", 200)
                     if status >= 400:
                         raise RuntimeError(f"Catalyst service returned HTTP {status}")
