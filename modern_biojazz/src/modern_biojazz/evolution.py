@@ -97,11 +97,12 @@ class LLMEvolutionEngine:
 
     def _mutate_candidate(self, network: ReactionNetwork, budget: int) -> ReactionNetwork:
         last_child: ReactionNetwork | None = None
+        base_model_code = self._model_code(network)
         for _ in range(8):
             child = network.copy()
             last_child = child
             actions = self.mutator.action_library(child)
-            choices = self.proposer.propose(self._model_code(child), list(actions.keys()), budget)
+            choices = self.proposer.propose(base_model_code, list(actions.keys()), budget)
             for action_name in choices:
                 action = actions.get(action_name)
                 if action is not None:
