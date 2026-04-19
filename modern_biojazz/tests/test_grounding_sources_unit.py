@@ -1,7 +1,17 @@
 from __future__ import annotations
 
+import json
+import urllib.parse
+from pathlib import Path
 from typing import Any, Dict, List
-from modern_biojazz.grounding_sources import build_grounding_payload_from_sources
+from unittest.mock import patch, mock_open
+
+from modern_biojazz.grounding_sources import (
+    build_grounding_payload_from_sources,
+    OmniPathClient,
+    INDRAClient,
+    load_grounding_snapshot,
+)
 
 
 def test_build_grounding_payload_empty():
@@ -73,3 +83,65 @@ def test_build_grounding_payload_logic():
 
     # STAT3 (abstract) -> SOCS3 (node) : No match -> 0.2
     assert conf["STAT3->SOCS3"] == 0.2
+
+
+@patch("urllib.request.urlopen")
+def test_omnipath_client_fetch_interactions(mock_urlopen):
+    # Setup mock response
+    mock_response = mock_urlopen.return_value.__enter__.return_value
+    expected_payload = [{"source": "STAT3", "target": "SOCS3"}]
+    mock_response.read.return_value = json.dumps(expected_payload).encode("utf-8")
+
+    client = OmniPathClient()
+    genes = ["STAT3", "SOCS3"]
+    result = client.fetch_interactions(genes)
+
+    assert result == expected_payload
+
+    # Verify that the URL was constructed properly
+    args, kwargs = mock_urlopen.call_args
+    req = args[0]
+    assert req.method == "GET"
+
+    # URL should contain the genes sorted
+    expected_genes = "SOCS3,STAT3"
+    assert f"sources={urllib.parse.quote(expected_genes)}" in req.full_url
+    assert f"targets={urllib.parse.quote(expected_genes)}" in req.full_url
+    assert "genesymbols=1" in req.full_url
+    assert req.full_url.startswith("https://omnipathdb.org/interactions/?")
+
+
+@patch("urllib.request.urlopen")
+def test_indra_client_fetch_statements(mock_urlopen):
+    mock_response = mock_urlopen.return_value.__enter__.return_value
+    expected_statements = [{"type": "Phosphorylation"}]
+    mock_response.read.return_value = json.dumps({"statements": expected_statements}).encode("utf-8")
+
+    client = INDRAClient()
+    genes = ["STAT3", "SOCS3"]
+    result = client.fetch_statements(genes)
+
+    assert result == expected_statements
+
+    args, kwargs = mock_urlopen.call_args
+    req = args[0]
+    assert req.method == "POST"
+    assert req.full_url == "https://api.indra.bio/statements/from_agents"
+    assert req.headers["Content-type"] == "application/json"
+
+    payload = json.loads(req.data.decode("utf-8"))
+    assert payload["subject"] == genes
+    assert payload["object"] == genes
+    assert payload["type"] == "Phosphorylation"
+    assert payload["format"] == "json"
+
+
+def test_load_grounding_snapshot():
+    expected_data = {"key": "value"}
+    json_data = json.dumps(expected_data)
+
+    with patch("builtins.open", mock_open(read_data=json_data)) as mock_file:
+        result = load_grounding_snapshot("dummy_path.json")
+
+        assert result == expected_data
+        mock_file.assert_called_once_with(Path("dummy_path.json"), "r", encoding="utf-8")
