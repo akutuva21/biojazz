@@ -238,7 +238,7 @@ sub staircase_equation {
     # is too large, some events will fall outside the period, so we must use
     # a modulus operator to fix this.  we also use Utils::fmod which can handle
     # fractional dividends
-    @events = map {fmod($_,$period)} @events;
+    @events = map {Utils::fmod($_,$period)} @events;
     my @order = sort {$events[$a] <=> $events[$b]} (0..$#events);
     @order = grep {$events[$_] != 0} @order;   # don't include 0.0 as an event
     @events = map {$events[$_]} @order;
@@ -252,8 +252,8 @@ sub staircase_equation {
         # final value is value at last event +/- one step
         my $final_value = $values[@values-1];
         $final_value += (
-            fmod(($period - $delay),$period) <= ($pulse_width - $rftime) &&
-            fmod(($period - $delay), $period) > 0 ?
+            Utils::fmod(($period - $delay),$period) <= ($pulse_width - $rftime) &&
+            Utils::fmod(($period - $delay), $period) > 0 ?
             ($concentration/$steps) :
             (-$concentration/$steps)
         );
@@ -371,7 +371,7 @@ sub ramp_equation {
     # is too large, some events will fall outside the period, so we must use
     # a modulus operator to fix this.  we also use Utils::fmod which can handle
     # fractional dividends
-    @events = map {fmod($_, $period)} @events;
+    @events = map {Utils::fmod($_, $period)} @events;
     my @order = sort {$events[$a] <=> $events[$b]} (0..$#events);
     @order = grep {$events[$_] != 0} @order;   # don't include 0.0 as an event
     @events = map {$events[$_]} @order;
