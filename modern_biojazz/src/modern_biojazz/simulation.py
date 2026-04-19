@@ -10,6 +10,14 @@ from typing import Any, Dict, Protocol
 from .site_graph import ReactionNetwork
 
 
+@dataclass
+class SimulationConfig:
+    t_end: float = 20.0
+    dt: float = 1.0
+    solver: str = "Rodas5P"
+    initial_conditions: Dict[str, float] | None = None
+
+
 class SimulationBackend(Protocol):
     def simulate(
         self,
@@ -18,8 +26,7 @@ class SimulationBackend(Protocol):
         dt: float,
         solver: str,
         initial_conditions: Dict[str, float] | None = None,
-    ) -> Dict[str, Any]:
-        ...
+    ) -> Dict[str, Any]: ...
 
 
 class FitnessScorer(Protocol):
@@ -29,12 +36,8 @@ class FitnessScorer(Protocol):
         *,
         backend: SimulationBackend | None = None,
         network: ReactionNetwork | None = None,
-        t_end: float = 20.0,
-        dt: float = 1.0,
-        solver: str = "Rodas5P",
-        initial_conditions: Dict[str, float] | None = None,
-    ) -> float:
-        ...
+        config: SimulationConfig | None = None,
+    ) -> float: ...
 
 
 @dataclass
@@ -67,7 +70,9 @@ class CatalystHTTPClient:
                     headers={"Content-Type": "application/json"},
                     method="POST",
                 )
-                with urllib.request.urlopen(req, timeout=self.timeout_seconds) as response:
+                with urllib.request.urlopen(
+                    req, timeout=self.timeout_seconds
+                ) as response:
                     status = getattr(response, "status", 200)
                     if status >= 400:
                         raise RuntimeError(f"Catalyst service returned HTTP {status}")
@@ -78,7 +83,9 @@ class CatalystHTTPClient:
                     time.sleep(0.2 * (attempt + 1))
                     continue
                 break
-        raise RuntimeError(f"Failed to simulate network via Catalyst service: {last_error}") from last_error
+        raise RuntimeError(
+            f"Failed to simulate network via Catalyst service: {last_error}"
+        ) from last_error
 
 
 @dataclass
@@ -172,7 +179,10 @@ class LocalCatalystEngine:
             output_species = species_order[0] if species_order else ""
 
         for ti, tval in enumerate(t_eval):
-            species_map = {name: max(0.0, float(y_series[index[name]][ti])) for name in species_order}
+            species_map = {
+                name: max(0.0, float(y_series[index[name]][ti]))
+                for name in species_order
+            }
             trajectory.append(
                 {
                     "t": tval,
@@ -202,20 +212,21 @@ class FitnessEvaluator:
         *,
         backend: SimulationBackend | None = None,
         network: ReactionNetwork | None = None,
-        t_end: float = 20.0,
-        dt: float = 1.0,
-        solver: str = "Rodas5P",
-        initial_conditions: Dict[str, float] | None = None,
+        config: SimulationConfig | None = None,
     ) -> float:
+        if config is None:
+            config = SimulationConfig()
         if simulation_result is None:
             if backend is None or network is None:
-                raise ValueError("Either simulation_result or both backend and network must be provided.")
+                raise ValueError(
+                    "Either simulation_result or both backend and network must be provided."
+                )
             simulation_result = backend.simulate(
                 network,
-                t_end=t_end,
-                dt=dt,
-                solver=solver,
-                initial_conditions=initial_conditions,
+                t_end=config.t_end,
+                dt=config.dt,
+                solver=config.solver,
+                initial_conditions=config.initial_conditions,
             )
 
         trajectory = simulation_result.get("trajectory", [])
@@ -241,27 +252,32 @@ class UltrasensitiveFitnessEvaluator:
         *,
         backend: SimulationBackend | None = None,
         network: ReactionNetwork | None = None,
-        t_end: float = 30.0,
-        dt: float = 0.5,
-        solver: str = "Rodas5P",
-        _initial_conditions: Dict[str, float] | None = None,
+        config: SimulationConfig | None = None,
     ) -> float:
         if backend is None or network is None:
-            raise ValueError("UltrasensitiveFitnessEvaluator requires backend and network.")
+            raise ValueError(
+                "UltrasensitiveFitnessEvaluator requires backend and network."
+            )
+        if config is None:
+            config = SimulationConfig(t_end=30.0, dt=0.5)
 
         responses = []
         for dose in self.doses:
             result = backend.simulate(
                 network,
-                t_end=t_end,
-                dt=dt,
-                solver=solver,
+                t_end=config.t_end,
+                dt=config.dt,
+                solver=config.solver,
                 initial_conditions={self.input_species: dose},
             )
             series = result.get("trajectory", [])
             final = 0.0
             if series:
-                final = float(series[-1].get("species", {}).get(self.output_species, series[-1].get("output", 0.0)))
+                final = float(
+                    series[-1]
+                    .get("species", {})
+                    .get(self.output_species, series[-1].get("output", 0.0))
+                )
             responses.append(max(1e-8, final))
 
         lo = responses[0]
@@ -280,7 +296,9 @@ class UltrasensitiveFitnessEvaluator:
         n_h = math.log10(81.0) / math.log10(d90 / d10)
         return max(0.0, min(10.0, n_h))
 
-    def _interpolate_dose(self, doses: tuple[float, ...], responses: list[float], target: float) -> float | None:
+    def _interpolate_dose(
+        self, doses: tuple[float, ...], responses: list[float], target: float
+    ) -> float | None:
         for i in range(1, len(doses)):
             y0, y1 = responses[i - 1], responses[i]
             if (y0 <= target <= y1) or (y1 <= target <= y0):
