@@ -44,6 +44,7 @@ collect_info_from_networks
 #######################################################################################
 use FindBin qw($Bin);
 use Storable qw(store retrieve);
+use Module::Load;
 
 use Utils;
 use Globals qw ($verbosity $TAG $config_ref);
@@ -240,7 +241,7 @@ sub save_genome {
 # Synopsis: scoring genome with config_ref and scoring_ref which defined in configure files
 #--------------------------------------------------------------------------------------
 sub score_genome {
-    eval("use $config_ref->{scoring_class};");
+    eval { load $config_ref->{scoring_class}; };
     if ($@) {print $@; return;}
     my $analysis_dir = defined $config_ref->{analysis_dir} ? $config_ref->{analysis_dir} : "analysis";
 
@@ -283,7 +284,8 @@ sub score_generation {
     printn "Scoring generation $generation_num";
     my $analysis_dir = defined $config_ref->{analysis_dir} ? $config_ref->{analysis_dir} : "analysis";
 
-    eval("use $config_ref->{scoring_class};");
+    eval { load $config_ref->{scoring_class}; };
+    if ($@) {print $@; return;}
 
     $scoring_ref = $config_ref->{scoring_class}->new({
             node_ID => 999,
@@ -332,7 +334,8 @@ sub score_generation {
 
 sub rescore_genomes {
     my $regular_expression = shift;
-    eval("use $config_ref->{scoring_class};");
+    eval { load $config_ref->{scoring_class}; };
+    if ($@) {print $@; return;}
     my $analysis_dir = defined $config_ref->{analysis_dir} ? $config_ref->{analysis_dir} : "analysis";
 
     $scoring_ref = $config_ref->{scoring_class}->new({
