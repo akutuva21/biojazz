@@ -1,7 +1,66 @@
 from __future__ import annotations
 
+import json
+import urllib.request
+from unittest.mock import MagicMock, patch
 from typing import Any, Dict, List
-from modern_biojazz.grounding_sources import build_grounding_payload_from_sources
+from modern_biojazz.grounding_sources import (
+    build_grounding_payload_from_sources,
+    INDRAClient,
+    OmniPathClient,
+)
+
+
+def test_indra_client_fetch_statements():
+    client = INDRAClient()
+    genes = ["STAT3", "SOCS3"]
+    mock_response_data = {"statements": [{"id": "stmt1", "type": "Phosphorylation"}]}
+
+    with patch("urllib.request.urlopen") as mock_urlopen:
+        mock_response = MagicMock()
+        mock_response.read.return_value = json.dumps(mock_response_data).encode("utf-8")
+        mock_response.__enter__.return_value = mock_response
+        mock_urlopen.return_value = mock_response
+
+        statements = client.fetch_statements(genes)
+
+        assert statements == mock_response_data["statements"]
+        mock_urlopen.assert_called_once()
+        req = mock_urlopen.call_args[0][0]
+        assert isinstance(req, urllib.request.Request)
+        assert req.full_url == "https://api.indra.bio/statements/from_agents"
+        assert req.get_method() == "POST"
+        assert req.headers["Content-type"] == "application/json"
+
+        sent_payload = json.loads(req.data.decode("utf-8"))
+        assert sent_payload["subject"] == genes
+        assert sent_payload["object"] == genes
+        assert sent_payload["type"] == "Phosphorylation"
+        assert sent_payload["format"] == "json"
+
+
+def test_omnipath_client_fetch_interactions():
+    client = OmniPathClient()
+    genes = ["STAT3", "SOCS3"]
+    mock_response_data = [{"source": "STAT3", "target": "SOCS3"}]
+
+    with patch("urllib.request.urlopen") as mock_urlopen:
+        mock_response = MagicMock()
+        mock_response.read.return_value = json.dumps(mock_response_data).encode("utf-8")
+        mock_response.__enter__.return_value = mock_response
+        mock_urlopen.return_value = mock_response
+
+        interactions = client.fetch_interactions(genes)
+
+        assert interactions == mock_response_data
+        mock_urlopen.assert_called_once()
+        req = mock_urlopen.call_args[0][0]
+        assert isinstance(req, urllib.request.Request)
+        assert req.get_method() == "GET"
+        assert "omnipathdb.org/interactions/" in req.full_url
+        assert "genesymbols=1" in req.full_url
+        assert "sources=SOCS3%2CSTAT3" in req.full_url  # sorted genes
+        assert "targets=SOCS3%2CSTAT3" in req.full_url
 
 
 def test_build_grounding_payload_empty():
