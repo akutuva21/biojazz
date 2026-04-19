@@ -52,6 +52,7 @@ use warnings;
 # STANDARD PACKAGES
 #######################################################################################
 use Getopt::Long;
+use Text::ParseWords;
 use English;			# Use english names for global system variables
 
 use 5.008_000;            # require perl version 5.8.0 or higher
@@ -198,7 +199,41 @@ rescore_genomes() if $RESCORE && defined $config_ref->{config_file};
 
 
 if (defined $COMMAND) {
-    eval("$COMMAND");  warn if $@;
+    my %allowed_cmds = map { $_ => 1 } qw(
+        create_workspace
+        evolve
+        load_genome
+        save_genome
+        score_genome
+        score_generation
+        rescore_genomes
+        collect_history_from_genomes
+        collect_history_from_logfile
+        collect_info_from_networks
+    );
+
+    if ($COMMAND =~ /^\s*([a-zA-Z0-9_]+)\s*(?:\((.*)\))?\s*;?\s*$/) {
+        my $func = $1;
+        my $args_str = $2;
+
+        if ($allowed_cmds{$func}) {
+            my @args = ();
+            if (defined $args_str && $args_str =~ /\S/) {
+                $args_str =~ s/=>/,/g;
+                @args = Text::ParseWords::parse_line('\s*,\s*', 0, $args_str);
+            }
+            no strict 'refs';
+            if (defined &$func) {
+                &{$func}(@args);
+            } else {
+                warn "Error: Command '$func' is not implemented.\n";
+            }
+        } else {
+            warn "Error: Command '$func' is not permitted for security reasons.\n";
+        }
+    } else {
+        warn "Error: Invalid command format. Only function calls are permitted.\n";
+    }
 }
 
 if (defined $SCRIPT) {
