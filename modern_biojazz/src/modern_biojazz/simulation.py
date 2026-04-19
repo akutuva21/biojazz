@@ -116,16 +116,39 @@ class LocalCatalystEngine:
         stiffness_proxy = (max(rates) / min(rates)) > 100.0
         t_eval = [i * dt for i in range(int(t_end / dt) + 1)]
 
+        compiled_rules = []
+        for rule in network.rules:
+            r_indices = [index[r] for r in rule.reactants]
+            p_indices = [index[p] for p in rule.products]
+            rate = max(0.0, float(rule.rate))
+
+            # Combine net stoich changes
+            net_stoich = {}
+            for r in r_indices:
+                net_stoich[r] = net_stoich.get(r, 0) - 1
+            for p in p_indices:
+                net_stoich[p] = net_stoich.get(p, 0) + 1
+
+            compiled_rules.append((
+                rate,
+                tuple(r_indices),
+                tuple((idx, count) for idx, count in net_stoich.items() if count != 0)
+            ))
+
         def rhs(_t: float, y: list[float]) -> list[float]:
-            dydt = [0.0 for _ in y]
-            for rule in network.rules:
-                flux = max(0.0, float(rule.rate))
-                for reactant in rule.reactants:
-                    flux *= max(0.0, y[index[reactant]])
-                for reactant in rule.reactants:
-                    dydt[index[reactant]] -= flux
-                for product in rule.products:
-                    dydt[index[product]] += flux
+            dydt = [0.0] * len(y)
+            for rate, r_indices, stoich in compiled_rules:
+                flux = rate
+                for r_idx in r_indices:
+                    v = y[r_idx]
+                    if v <= 0.0:
+                        flux = 0.0
+                        break
+                    flux *= v
+
+                if flux > 0.0:
+                    for idx, count in stoich:
+                        dydt[idx] += flux * count
             return dydt
 
         trajectory = []
