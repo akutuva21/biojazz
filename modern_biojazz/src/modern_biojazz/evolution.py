@@ -7,7 +7,7 @@ from typing import Callable, List, Protocol
 
 from .mutation import GraphMutator
 from .site_graph import ReactionNetwork
-from .simulation import SimulationBackend, FitnessScorer
+from .simulation import SimulationBackend, FitnessScorer, SimulationConfig
 
 
 class LLMProposer(Protocol):
@@ -140,9 +140,11 @@ class LLMEvolutionEngine:
             score = self.fitness.score(
                 backend=self.backend,
                 network=network,
-                t_end=config.sim_t_end,
-                dt=config.sim_dt,
-                solver=config.sim_solver,
+                config=SimulationConfig(
+                    t_end=config.sim_t_end,
+                    dt=config.sim_dt,
+                    solver=config.sim_solver,
+                ),
             )
         except Exception as error:
             self._cegis_feedback(
