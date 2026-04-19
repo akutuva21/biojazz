@@ -94,16 +94,15 @@ class LocalCatalystEngine:
         initial_conditions: Dict[str, float] | None = None,
     ) -> Dict[str, Any]:
         species_order = list(network.proteins.keys())
+        seen = set(species_order)
         for rule in network.rules:
             for token in [*rule.reactants, *rule.products]:
-                if token not in species_order:
+                if token not in seen:
+                    seen.add(token)
                     species_order.append(token)
 
         index = {name: i for i, name in enumerate(species_order)}
-        y0 = [1.0 for _ in species_order]
-        for i, name in enumerate(species_order):
-            if name not in network.proteins:
-                y0[i] = 0.0
+        y0 = [1.0 if name in network.proteins else 0.0 for name in species_order]
         if initial_conditions:
             for name, value in initial_conditions.items():
                 if name not in index:
