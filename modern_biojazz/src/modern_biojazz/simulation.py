@@ -4,10 +4,33 @@ import json
 import math
 import time
 import urllib.request
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any, Dict, Protocol
 
 from .site_graph import ReactionNetwork
+
+
+class LazySpeciesMap(Mapping):
+    __slots__ = ("_y_series", "_index", "_species_order", "_ti")
+
+    def __init__(self, y_series: list[list[float]], index: dict[str, int], species_order: list[str], ti: int):
+        self._y_series = y_series
+        self._index = index
+        self._species_order = species_order
+        self._ti = ti
+
+    def __getitem__(self, key: str) -> float:
+        idx = self._index.get(key)
+        if idx is not None:
+            return max(0.0, float(self._y_series[idx][self._ti]))
+        raise KeyError(key)
+
+    def __iter__(self):
+        return iter(self._species_order)
+
+    def __len__(self) -> int:
+        return len(self._species_order)
 
 
 class SimulationBackend(Protocol):
@@ -171,13 +194,16 @@ class LocalCatalystEngine:
         if output_species not in index:
             output_species = species_order[0] if species_order else ""
 
+        output_idx = index.get(output_species)
+
         for ti, tval in enumerate(t_eval):
-            species_map = {name: max(0.0, float(y_series[index[name]][ti])) for name in species_order}
+            output_val = max(0.0, float(y_series[output_idx][ti])) if output_idx is not None else 0.0
+
             trajectory.append(
                 {
                     "t": tval,
-                    "output": species_map.get(output_species, 0.0),
-                    "species": species_map,
+                    "output": output_val,
+                    "species": LazySpeciesMap(y_series, index, species_order, ti),
                 }
             )
 
