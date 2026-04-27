@@ -21,7 +21,9 @@ class PipelineResult:
 
 
 class ModernBioJazzPipeline:
-    def __init__(self, evolution_engine: LLMEvolutionEngine, grounding_engine: GroundingEngine) -> None:
+    def __init__(
+        self, evolution_engine: LLMEvolutionEngine, grounding_engine: GroundingEngine
+    ) -> None:
         self.evolution_engine = evolution_engine
         self.grounding_engine = grounding_engine
 
@@ -33,7 +35,9 @@ class ModernBioJazzPipeline:
     ) -> PipelineResult:
         if config.do_grounding and grounding_payload is not None:
             allowed = set(grounding_payload.get("abstract_types", {}).keys())
-            self.evolution_engine.candidate_filter = self._grounding_constraint_filter(allowed)
+            self.evolution_engine.candidate_filter = self._grounding_constraint_filter(
+                allowed
+            )
 
         evolution = self.evolution_engine.run(seed_network, config.evolution)
         grounding_result: GroundingResult | None = None

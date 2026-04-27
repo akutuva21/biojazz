@@ -4,7 +4,10 @@ import json
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
-from modern_biojazz.llm_proposer import OpenAICompatibleProposer, SafeActionFilterProposer
+from modern_biojazz.llm_proposer import (
+    OpenAICompatibleProposer,
+    SafeActionFilterProposer,
+)
 
 
 class _LLMHandler(BaseHTTPRequestHandler):
@@ -13,7 +16,7 @@ class _LLMHandler(BaseHTTPRequestHandler):
             "choices": [
                 {
                     "message": {
-                        "content": "{\"actions\":[\"add_binding\",\"DROP_TABLE\",\"add_site\"]}"
+                        "content": '{"actions":["add_binding","DROP_TABLE","add_site"]}'
                     }
                 }
             ]

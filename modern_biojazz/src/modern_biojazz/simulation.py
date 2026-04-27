@@ -18,8 +18,7 @@ class SimulationBackend(Protocol):
         dt: float,
         solver: str,
         initial_conditions: Dict[str, float] | None = None,
-    ) -> Dict[str, Any]:
-        ...
+    ) -> Dict[str, Any]: ...
 
 
 class FitnessScorer(Protocol):
@@ -33,8 +32,7 @@ class FitnessScorer(Protocol):
         dt: float = 1.0,
         solver: str = "Rodas5P",
         initial_conditions: Dict[str, float] | None = None,
-    ) -> float:
-        ...
+    ) -> float: ...
 
 
 @dataclass
@@ -67,7 +65,9 @@ class CatalystHTTPClient:
                     headers={"Content-Type": "application/json"},
                     method="POST",
                 )
-                with urllib.request.urlopen(req, timeout=self.timeout_seconds) as response:
+                with urllib.request.urlopen(
+                    req, timeout=self.timeout_seconds
+                ) as response:
                     status = getattr(response, "status", 200)
                     if status >= 400:
                         raise RuntimeError(f"Catalyst service returned HTTP {status}")
@@ -78,7 +78,9 @@ class CatalystHTTPClient:
                     time.sleep(0.2 * (attempt + 1))
                     continue
                 break
-        raise RuntimeError(f"Failed to simulate network via Catalyst service: {last_error}") from last_error
+        raise RuntimeError(
+            f"Failed to simulate network via Catalyst service: {last_error}"
+        ) from last_error
 
 
 @dataclass
@@ -116,16 +118,37 @@ class LocalCatalystEngine:
         stiffness_proxy = (max(rates) / min(rates)) > 100.0
         t_eval = [i * dt for i in range(int(t_end / dt) + 1)]
 
+        compiled_rules = []
+        for rule in network.rules:
+            net_change: dict[int, float] = {}
+            for r in rule.reactants:
+                idx = index[r]
+                net_change[idx] = net_change.get(idx, 0.0) - 1.0
+            for p in rule.products:
+                idx = index[p]
+                net_change[idx] = net_change.get(idx, 0.0) + 1.0
+
+            compiled_rules.append(
+                (
+                    max(0.0, float(rule.rate)),
+                    [index[r] for r in rule.reactants],
+                    [
+                        (idx, change)
+                        for idx, change in net_change.items()
+                        if change != 0.0
+                    ],
+                )
+            )
+
         def rhs(_t: float, y: list[float]) -> list[float]:
-            dydt = [0.0 for _ in y]
-            for rule in network.rules:
-                flux = max(0.0, float(rule.rate))
-                for reactant in rule.reactants:
-                    flux *= max(0.0, y[index[reactant]])
-                for reactant in rule.reactants:
-                    dydt[index[reactant]] -= flux
-                for product in rule.products:
-                    dydt[index[product]] += flux
+            dydt = [0.0] * len(y)
+            for rate, r_indices, net_changes in compiled_rules:
+                flux = rate
+                for r_idx in r_indices:
+                    flux *= max(0.0, y[r_idx])
+                if flux > 0.0:
+                    for idx, change in net_changes:
+                        dydt[idx] += flux * change
             return dydt
 
         trajectory = []
@@ -172,7 +195,10 @@ class LocalCatalystEngine:
             output_species = species_order[0] if species_order else ""
 
         for ti, tval in enumerate(t_eval):
-            species_map = {name: max(0.0, float(y_series[index[name]][ti])) for name in species_order}
+            species_map = {
+                name: max(0.0, float(y_series[index[name]][ti]))
+                for name in species_order
+            }
             trajectory.append(
                 {
                     "t": tval,
@@ -209,7 +235,9 @@ class FitnessEvaluator:
     ) -> float:
         if simulation_result is None:
             if backend is None or network is None:
-                raise ValueError("Either simulation_result or both backend and network must be provided.")
+                raise ValueError(
+                    "Either simulation_result or both backend and network must be provided."
+                )
             simulation_result = backend.simulate(
                 network,
                 t_end=t_end,
@@ -247,7 +275,9 @@ class UltrasensitiveFitnessEvaluator:
         _initial_conditions: Dict[str, float] | None = None,
     ) -> float:
         if backend is None or network is None:
-            raise ValueError("UltrasensitiveFitnessEvaluator requires backend and network.")
+            raise ValueError(
+                "UltrasensitiveFitnessEvaluator requires backend and network."
+            )
 
         responses = []
         for dose in self.doses:
@@ -261,7 +291,11 @@ class UltrasensitiveFitnessEvaluator:
             series = result.get("trajectory", [])
             final = 0.0
             if series:
-                final = float(series[-1].get("species", {}).get(self.output_species, series[-1].get("output", 0.0)))
+                final = float(
+                    series[-1]
+                    .get("species", {})
+                    .get(self.output_species, series[-1].get("output", 0.0))
+                )
             responses.append(max(1e-8, final))
 
         lo = responses[0]
@@ -280,7 +314,9 @@ class UltrasensitiveFitnessEvaluator:
         n_h = math.log10(81.0) / math.log10(d90 / d10)
         return max(0.0, min(10.0, n_h))
 
-    def _interpolate_dose(self, doses: tuple[float, ...], responses: list[float], target: float) -> float | None:
+    def _interpolate_dose(
+        self, doses: tuple[float, ...], responses: list[float], target: float
+    ) -> float | None:
         for i in range(1, len(doses)):
             y0, y1 = responses[i - 1], responses[i]
             if (y0 <= target <= y1) or (y1 <= target <= y0):

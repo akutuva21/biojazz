@@ -2,7 +2,11 @@ from __future__ import annotations
 
 import random
 
-from modern_biojazz.evolution import LLMEvolutionEngine, EvolutionConfig, DeterministicProposer
+from modern_biojazz.evolution import (
+    LLMEvolutionEngine,
+    EvolutionConfig,
+    DeterministicProposer,
+)
 from modern_biojazz.mutation import GraphMutator
 from modern_biojazz.site_graph import ReactionNetwork
 from modern_biojazz.simulation import LocalCatalystEngine, FitnessEvaluator
@@ -46,7 +50,9 @@ def test_evolution_handles_empty_seed_network():
 
     result = engine.run(
         empty,
-        EvolutionConfig(population_size=4, generations=2, mutations_per_candidate=1, islands=1),
+        EvolutionConfig(
+            population_size=4, generations=2, mutations_per_candidate=1, islands=1
+        ),
     )
 
     assert result.best_score >= 0.0
@@ -54,10 +60,16 @@ def test_evolution_handles_empty_seed_network():
 
 
 class _RejectingProposer:
-    def propose(self, model_code: str, action_names: list[str], budget: int) -> list[str]:
+    def propose(
+        self, model_code: str, action_names: list[str], budget: int
+    ) -> list[str]:
         del model_code
         del budget
-        return ["add_phosphorylation"] if "add_phosphorylation" in action_names else action_names[:1]
+        return (
+            ["add_phosphorylation"]
+            if "add_phosphorylation" in action_names
+            else action_names[:1]
+        )
 
     def record_feedback(self, score: float, notes: str) -> None:
         del score
@@ -85,7 +97,9 @@ def test_cegis_feedback_on_filter_rejection(seed_network):
         def __init__(self):
             self.feedback = []
 
-        def propose(self, model_code: str, action_names: list[str], budget: int) -> list[str]:
+        def propose(
+            self, model_code: str, action_names: list[str], budget: int
+        ) -> list[str]:
             del model_code
             del budget
             return action_names[:1]
@@ -105,7 +119,8 @@ def test_cegis_feedback_on_filter_rejection(seed_network):
 
     _ = engine._mutate_candidate(seed_network, budget=1)
     assert any(
-        '"failure_type":"filter_rejection"' in notes or '"failure_type": "filter_rejection"' in notes
+        '"failure_type":"filter_rejection"' in notes
+        or '"failure_type": "filter_rejection"' in notes
         for _, notes in proposer.feedback
     )
 
@@ -119,7 +134,9 @@ def test_cegis_feedback_on_simulation_exception(seed_network):
         def __init__(self):
             self.feedback = []
 
-        def propose(self, model_code: str, action_names: list[str], budget: int) -> list[str]:
+        def propose(
+            self, model_code: str, action_names: list[str], budget: int
+        ) -> list[str]:
             del model_code
             del action_names
             del budget
@@ -137,9 +154,15 @@ def test_cegis_feedback_on_simulation_exception(seed_network):
         rng=random.Random(9),
     )
 
-    score = engine._evaluate(seed_network, EvolutionConfig(population_size=1, generations=1, mutations_per_candidate=1, islands=1))
+    score = engine._evaluate(
+        seed_network,
+        EvolutionConfig(
+            population_size=1, generations=1, mutations_per_candidate=1, islands=1
+        ),
+    )
     assert score == 0.0
     assert any(
-        '"failure_type":"simulation_exception"' in notes or '"failure_type": "simulation_exception"' in notes
+        '"failure_type":"simulation_exception"' in notes
+        or '"failure_type": "simulation_exception"' in notes
         for _, notes in proposer.feedback
     )

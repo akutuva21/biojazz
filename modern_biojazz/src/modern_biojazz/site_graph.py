@@ -64,7 +64,9 @@ class ReactionNetwork:
             )
             for r in self.rules
         ]
-        return ReactionNetwork(proteins=proteins, rules=rules, metadata=deepcopy(self.metadata))
+        return ReactionNetwork(
+            proteins=proteins, rules=rules, metadata=deepcopy(self.metadata)
+        )
 
     def validate(self) -> None:
         for protein_name, protein in self.proteins.items():
@@ -80,11 +82,17 @@ class ReactionNetwork:
 
         for idx, rule in enumerate(self.rules):
             if not rule.reactants and rule.rule_type != "synthesis":
-                raise ReactionNetworkValidationError(f"Rule at index {idx} has no reactants.")
+                raise ReactionNetworkValidationError(
+                    f"Rule at index {idx} has no reactants."
+                )
             if not rule.products and rule.rule_type != "degradation":
-                raise ReactionNetworkValidationError(f"Rule at index {idx} has no products.")
+                raise ReactionNetworkValidationError(
+                    f"Rule at index {idx} has no products."
+                )
             if rule.rate < 0:
-                raise ReactionNetworkValidationError(f"Rule '{rule.name}' has negative rate {rule.rate}.")
+                raise ReactionNetworkValidationError(
+                    f"Rule '{rule.name}' has negative rate {rule.rate}."
+                )
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -122,14 +130,20 @@ class ReactionNetwork:
         rules_raw = payload.get("rules", [])
 
         if not isinstance(proteins_raw, dict):
-            raise ReactionNetworkValidationError("'proteins' must be a dictionary of protein definitions.")
+            raise ReactionNetworkValidationError(
+                "'proteins' must be a dictionary of protein definitions."
+            )
         if not isinstance(rules_raw, list):
-            raise ReactionNetworkValidationError("'rules' must be a list of rule definitions.")
+            raise ReactionNetworkValidationError(
+                "'rules' must be a list of rule definitions."
+            )
 
         proteins: Dict[str, Protein] = {}
         for pname, payload_p in proteins_raw.items():
             if "name" not in payload_p:
-                raise ReactionNetworkValidationError(f"Protein '{pname}' is missing required key 'name'.")
+                raise ReactionNetworkValidationError(
+                    f"Protein '{pname}' is missing required key 'name'."
+                )
             sites: List[Site] = []
             for s in payload_p.get("sites", []):
                 if "name" not in s or "site_type" not in s:
@@ -148,7 +162,11 @@ class ReactionNetwork:
 
         rules: List[Rule] = []
         for idx, r in enumerate(rules_raw):
-            missing = [k for k in ["name", "rule_type", "reactants", "products", "rate"] if k not in r]
+            missing = [
+                k
+                for k in ["name", "rule_type", "reactants", "products", "rate"]
+                if k not in r
+            ]
             if missing:
                 raise ReactionNetworkValidationError(
                     f"Rule at index {idx} is missing required keys: {', '.join(missing)}"
@@ -163,6 +181,10 @@ class ReactionNetwork:
                 )
             )
 
-        network = ReactionNetwork(proteins=proteins, rules=rules, metadata=deepcopy(payload.get("metadata", {})))
+        network = ReactionNetwork(
+            proteins=proteins,
+            rules=rules,
+            metadata=deepcopy(payload.get("metadata", {})),
+        )
         network.validate()
         return network

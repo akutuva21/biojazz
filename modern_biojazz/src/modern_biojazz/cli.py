@@ -24,8 +24,14 @@ def main() -> None:
     parser.add_argument("--sim-dt", type=float, default=1.0)
     parser.add_argument("--sim-solver", default="Rodas5P")
     parser.add_argument("--sim-backend", choices=["local", "http"], default="local")
-    parser.add_argument("--sim-base-url", help="Base URL of Catalyst simulation service")
-    parser.add_argument("--llm-provider", choices=["deterministic", "openai_compatible"], default="deterministic")
+    parser.add_argument(
+        "--sim-base-url", help="Base URL of Catalyst simulation service"
+    )
+    parser.add_argument(
+        "--llm-provider",
+        choices=["deterministic", "openai_compatible"],
+        default="deterministic",
+    )
     parser.add_argument("--llm-base-url", help="Base URL for OpenAI-compatible API")
     parser.add_argument("--llm-model", default="gpt-4o-mini")
     parser.add_argument("--llm-api-key-env", default="OPENAI_API_KEY")
@@ -49,10 +55,14 @@ def main() -> None:
 
     if args.llm_provider == "openai_compatible":
         if not args.llm_base_url:
-            raise ValueError("--llm-base-url is required when --llm-provider=openai_compatible")
+            raise ValueError(
+                "--llm-base-url is required when --llm-provider=openai_compatible"
+            )
         api_key = os.environ.get(args.llm_api_key_env, "")
         if not api_key:
-            raise ValueError(f"Environment variable {args.llm_api_key_env} must be set for llm provider")
+            raise ValueError(
+                f"Environment variable {args.llm_api_key_env} must be set for llm provider"
+            )
         proposer = SafeActionFilterProposer(
             OpenAICompatibleProposer(
                 base_url=args.llm_base_url,
@@ -91,13 +101,15 @@ def main() -> None:
         "best_score": result.evolution.best_score,
         "history": result.evolution.history,
         "best_network": result.evolution.best_network.to_dict(),
-        "grounding": None
-        if result.grounding is None
-        else {
-            "mapping": result.grounding.mapping,
-            "score": result.grounding.score,
-            "candidates_considered": result.grounding.candidates_considered,
-        },
+        "grounding": (
+            None
+            if result.grounding is None
+            else {
+                "mapping": result.grounding.mapping,
+                "score": result.grounding.score,
+                "candidates_considered": result.grounding.candidates_considered,
+            }
+        ),
     }
     print(json.dumps(output, indent=2))
 

@@ -85,12 +85,17 @@ class GroundingEngine:
         edge_types = {
             (r.reactants[0], r.reactants[-1], self._normalize_edge_type(r.rule_type))
             for r in network.rules
-            if len(r.reactants) >= 2 and r.reactants[0] in constraints and r.reactants[-1] in constraints
+            if len(r.reactants) >= 2
+            and r.reactants[0] in constraints
+            and r.reactants[-1] in constraints
         }
         normalized_real_interactions = [
-            (src, dst, self._normalize_edge_type(edge_t)) for src, dst, edge_t in real_interactions
+            (src, dst, self._normalize_edge_type(edge_t))
+            for src, dst, edge_t in real_interactions
         ]
-        constraints = self.prune_constraints_by_degree(network, constraints, normalized_real_interactions)
+        constraints = self.prune_constraints_by_degree(
+            network, constraints, normalized_real_interactions
+        )
         real_edge_set = set(normalized_real_interactions)
 
         solutions: List[Dict[str, str]] = []
@@ -149,4 +154,8 @@ class GroundingEngine:
 
         scored = [(score_mapping(m), m) for m in mappings]
         scored.sort(key=lambda x: x[0], reverse=True)
-        return GroundingResult(mapping=scored[0][1], score=scored[0][0], candidates_considered=len(mappings))
+        return GroundingResult(
+            mapping=scored[0][1],
+            score=scored[0][0],
+            candidates_considered=len(mappings),
+        )

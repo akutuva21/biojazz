@@ -2,7 +2,11 @@ from __future__ import annotations
 
 import builtins
 
-from modern_biojazz.simulation import FitnessEvaluator, LocalCatalystEngine, UltrasensitiveFitnessEvaluator
+from modern_biojazz.simulation import (
+    FitnessEvaluator,
+    LocalCatalystEngine,
+    UltrasensitiveFitnessEvaluator,
+)
 
 
 def test_fitness_evaluator_accepts_backend_network(seed_network):
@@ -14,7 +18,9 @@ def test_fitness_evaluator_accepts_backend_network(seed_network):
 
 def test_ultrasensitive_evaluator_matches_unified_interface(seed_network):
     engine = LocalCatalystEngine()
-    evaluator = UltrasensitiveFitnessEvaluator(input_species="STAT3", output_species="SOCS3")
+    evaluator = UltrasensitiveFitnessEvaluator(
+        input_species="STAT3", output_species="SOCS3"
+    )
     score = evaluator.score(backend=engine, network=seed_network, t_end=5.0, dt=1.0)
     assert score >= 0.0
 

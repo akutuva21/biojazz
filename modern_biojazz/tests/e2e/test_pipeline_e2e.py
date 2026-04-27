@@ -2,7 +2,11 @@ from __future__ import annotations
 
 import random
 
-from modern_biojazz.evolution import LLMEvolutionEngine, EvolutionConfig, DeterministicProposer
+from modern_biojazz.evolution import (
+    LLMEvolutionEngine,
+    EvolutionConfig,
+    DeterministicProposer,
+)
 from modern_biojazz.grounding import GroundingEngine
 from modern_biojazz.mutation import GraphMutator
 from modern_biojazz.pipeline import ModernBioJazzPipeline, PipelineConfig
@@ -35,7 +39,9 @@ def test_full_pipeline_e2e(seed_network, grounding_payload):
         grounding_payload={
             "abstract_types": grounding_payload["abstract_types"],
             "real_nodes": grounding_payload["real_nodes"],
-            "real_interactions": [tuple(x) for x in grounding_payload["real_interactions"]],
+            "real_interactions": [
+                tuple(x) for x in grounding_payload["real_interactions"]
+            ],
             "confidence_by_pair": grounding_payload["confidence_by_pair"],
         },
     )
