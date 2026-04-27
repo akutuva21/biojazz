@@ -53,6 +53,7 @@ use warnings;
 #######################################################################################
 use Getopt::Long;
 use English;			# Use english names for global system variables
+use Text::ParseWords;
 
 use 5.008_000;            # require perl version 5.8.0 or higher
 use Class::Std 0.0.8;     # require Class::Std version 0.0.8 or higher
@@ -198,7 +199,39 @@ rescore_genomes() if $RESCORE && defined $config_ref->{config_file};
 
 
 if (defined $COMMAND) {
-    eval("$COMMAND");  warn if $@;
+    my %allowlist = map { $_ => 1 } qw(
+        create_workspace evolve load_genome save_genome score_genome
+        score_generation rescore_genomes collect_history_from_genomes
+        collect_history_from_logfile collect_info_from_networks
+    );
+
+    if ($COMMAND =~ /^(\w+)(?:\s*\((.*)\))?$/) {
+        my $func = $1;
+        my $args_str = $2;
+
+        if ($allowlist{$func}) {
+            my @args;
+            if (defined $args_str && $args_str !~ /^\s*$/) {
+                @args = quotewords('\s*(?:,|=>)\s*', 0, $args_str);
+            }
+
+            # Strip any trailing/leading whitespace and quotes from args
+            foreach my $arg (@args) {
+                next unless defined $arg;
+                $arg =~ s/^\s+//;
+                $arg =~ s/\s+$//;
+                $arg =~ s/^['"](.*)['"]$/$1/;
+            }
+
+            no strict 'refs';
+            eval { &{"main::$func"}(@args) };
+            warn $@ if $@;
+        } else {
+            warn "Security Error: Function '$func' is not permitted for execution.\n";
+        }
+    } else {
+        warn "Security Error: Invalid command format: $COMMAND\n";
+    }
 }
 
 if (defined $SCRIPT) {
