@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from typing import Any, Dict, List
-from modern_biojazz.grounding_sources import build_grounding_payload_from_sources
+import json
+from unittest.mock import MagicMock, patch
+from modern_biojazz.grounding_sources import build_grounding_payload_from_sources, INDRAClient, OmniPathClient
 
 
 def test_build_grounding_payload_empty():
@@ -73,3 +75,69 @@ def test_build_grounding_payload_logic():
 
     # STAT3 (abstract) -> SOCS3 (node) : No match -> 0.2
     assert conf["STAT3->SOCS3"] == 0.2
+
+
+@patch("urllib.request.urlopen")
+def test_indra_client_fetch_statements(mock_urlopen):
+    # Setup mock response
+    mock_response = MagicMock()
+    mock_response.read.return_value = json.dumps({
+        "statements": [{"id": 1, "type": "Phosphorylation"}],
+        "other_data": "ignored"
+    }).encode("utf-8")
+    mock_urlopen.return_value.__enter__.return_value = mock_response
+
+    client = INDRAClient()
+    genes = ["STAT3", "JAK2"]
+
+    statements = client.fetch_statements(genes, stmt_type="Phosphorylation")
+
+    # Assert correct request structure
+    mock_urlopen.assert_called_once()
+    req = mock_urlopen.call_args[0][0]
+
+    assert req.full_url == "https://api.indra.bio/statements/from_agents"
+    assert req.method == "POST"
+    assert req.headers["Content-type"] == "application/json"
+
+    # Assert JSON payload
+    payload = json.loads(req.data.decode("utf-8"))
+    assert payload == {
+        "subject": ["STAT3", "JAK2"],
+        "object": ["STAT3", "JAK2"],
+        "type": "Phosphorylation",
+        "format": "json"
+    }
+
+    # Assert returned data matches the statements list
+    assert statements == [{"id": 1, "type": "Phosphorylation"}]
+
+@patch("urllib.request.urlopen")
+def test_omnipath_client_fetch_interactions(mock_urlopen):
+    mock_response = MagicMock()
+    mock_payload = [{"source": "A", "target": "B"}]
+    mock_response.read.return_value = json.dumps(mock_payload).encode("utf-8")
+    mock_urlopen.return_value.__enter__.return_value = mock_response
+
+    client = OmniPathClient()
+    genes = ["STAT3", "JAK2", "STAT3"] # Test deduplication and sorting
+
+    interactions = client.fetch_interactions(genes)
+
+    mock_urlopen.assert_called_once()
+    req = mock_urlopen.call_args[0][0]
+
+    assert req.method == "GET"
+    assert req.full_url.startswith("https://omnipathdb.org/interactions/?")
+
+    # Assert query params
+    import urllib.parse
+    query = urllib.parse.urlparse(req.full_url).query
+    params = urllib.parse.parse_qs(query)
+
+    assert params["genesymbols"] == ["1"]
+    assert params["sources"] == ["JAK2,STAT3"] # sorted unique
+    assert params["targets"] == ["JAK2,STAT3"]
+    assert params["format"] == ["json"]
+
+    assert interactions == mock_payload
