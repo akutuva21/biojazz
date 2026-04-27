@@ -25,6 +25,7 @@ use base qw();
 
     use Globals qw ($verbosity $TAG);
 
+    use Module::Load qw(load);
     use ScorCluster;
     use Generation;
 
@@ -203,10 +204,14 @@ use base qw();
                     undef);
                 my $defined_local_dir = (defined $local_dir) ? "$local_dir/$TAG" : undef;
 
-                eval("use $config_ref->{scoring_class};");
+                my $scoring_class = $config_ref->{scoring_class};
+                if ($scoring_class !~ /^[A-Za-z0-9_:]+$/) {
+                    die "Invalid scoring_class module name: $scoring_class\n";
+                }
+                eval { load $scoring_class; };
                 if ($@) {print $@; return;}
 
-                my $scoring_ref = $config_ref->{scoring_class}->new({
+                my $scoring_ref = $scoring_class->new({
                         config_file => $config_ref->{config_file},
                         node_ID => 999,
                         work_dir => "$config_ref->{work_dir}/$TAG",
@@ -301,10 +306,14 @@ use base qw();
                     undef);
                 my $defined_local_dir = (defined $local_dir) ? "$local_dir/$TAG" : undef;
 
-                eval("use $config_ref->{scoring_class};");
+                my $scoring_class = $config_ref->{scoring_class};
+                if ($scoring_class !~ /^[A-Za-z0-9_:]+$/) {
+                    die "Invalid scoring_class module name: $scoring_class\n";
+                }
+                eval { load $scoring_class; };
                 if ($@) {print $@; return;}
 
-                my $scoring_ref = $config_ref->{scoring_class}->new({
+                my $scoring_ref = $scoring_class->new({
                         config_file => $config_ref->{config_file},
                         node_ID => 999,
                         work_dir => "$config_ref->{work_dir}/$TAG",
@@ -421,10 +430,14 @@ use base qw();
             undef);
         my $defined_local_dir = (defined $local_dir) ? "$local_dir/$TAG" : undef;
 
-        eval("use $config_ref->{scoring_class};");
+        my $scoring_class = $config_ref->{scoring_class};
+        if ($scoring_class !~ /^[A-Za-z0-9_:]+$/) {
+            die "Invalid scoring_class module name: $scoring_class\n";
+        }
+        eval { load $scoring_class; };
         if ($@) {print $@; return;}
 
-        my $scoring_ref = $config_ref->{scoring_class}->new({
+        my $scoring_ref = $scoring_class->new({
                 config_file => $config_ref->{config_file},
                 node_ID => 999,
                 work_dir => "$config_ref->{work_dir}/$TAG",

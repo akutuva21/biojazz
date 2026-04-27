@@ -47,6 +47,7 @@ use Storable qw(store retrieve);
 
 use Utils;
 use Globals qw ($verbosity $TAG $config_ref);
+use Module::Load qw(load);
 
 use GenAlg;
 use History;
@@ -240,11 +241,15 @@ sub save_genome {
 # Synopsis: scoring genome with config_ref and scoring_ref which defined in configure files
 #--------------------------------------------------------------------------------------
 sub score_genome {
-    eval("use $config_ref->{scoring_class};");
+    my $scoring_class = $config_ref->{scoring_class};
+    if ($scoring_class !~ /^[A-Za-z0-9_:]+$/) {
+        die "Invalid scoring_class module name: $scoring_class\n";
+    }
+    eval { load $scoring_class; };
     if ($@) {print $@; return;}
     my $analysis_dir = defined $config_ref->{analysis_dir} ? $config_ref->{analysis_dir} : "analysis";
 
-    $scoring_ref = $config_ref->{scoring_class}->new({
+    $scoring_ref = $scoring_class->new({
             node_ID => 999,
             config_file => $config_ref->{config_file},
             work_dir => "$config_ref->{work_dir}/$analysis_dir/$TAG",
@@ -283,9 +288,14 @@ sub score_generation {
     printn "Scoring generation $generation_num";
     my $analysis_dir = defined $config_ref->{analysis_dir} ? $config_ref->{analysis_dir} : "analysis";
 
-    eval("use $config_ref->{scoring_class};");
+    my $scoring_class = $config_ref->{scoring_class};
+    if ($scoring_class !~ /^[A-Za-z0-9_:]+$/) {
+        die "Invalid scoring_class module name: $scoring_class\n";
+    }
+    eval { load $scoring_class; };
+    if ($@) {print $@; return;}
 
-    $scoring_ref = $config_ref->{scoring_class}->new({
+    $scoring_ref = $scoring_class->new({
             node_ID => 999,
             config_file => $config_ref->{config_file},
             work_dir => "$config_ref->{work_dir}/$analysis_dir/$TAG",
@@ -332,10 +342,15 @@ sub score_generation {
 
 sub rescore_genomes {
     my $regular_expression = shift;
-    eval("use $config_ref->{scoring_class};");
+    my $scoring_class = $config_ref->{scoring_class};
+    if ($scoring_class !~ /^[A-Za-z0-9_:]+$/) {
+        die "Invalid scoring_class module name: $scoring_class\n";
+    }
+    eval { load $scoring_class; };
+    if ($@) {print $@; return;}
     my $analysis_dir = defined $config_ref->{analysis_dir} ? $config_ref->{analysis_dir} : "analysis";
 
-    $scoring_ref = $config_ref->{scoring_class}->new({
+    $scoring_ref = $scoring_class->new({
             node_ID => 999,
             config_file => $config_ref->{config_file},
             work_dir => "$config_ref->{work_dir}/$analysis_dir/$TAG",
