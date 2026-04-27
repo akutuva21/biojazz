@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import json
 from typing import Any, Dict, List
-from modern_biojazz.grounding_sources import build_grounding_payload_from_sources
+from unittest.mock import MagicMock, patch
+
+from modern_biojazz.grounding_sources import OmniPathClient, build_grounding_payload_from_sources
 
 
 def test_build_grounding_payload_empty():
@@ -73,3 +76,39 @@ def test_build_grounding_payload_logic():
 
     # STAT3 (abstract) -> SOCS3 (node) : No match -> 0.2
     assert conf["STAT3->SOCS3"] == 0.2
+
+
+@patch("urllib.request.urlopen")
+@patch("urllib.request.Request")
+def test_omnipath_client_fetch_interactions(mock_request_class, mock_urlopen):
+    genes = ["SOCS3", "STAT3", "SOCS3"] # Include duplicates and unsorted to test sorting and uniqueness
+
+    # Mocking urlopen response
+    mock_response = MagicMock()
+    mock_response.read.return_value = json.dumps([{"source": "STAT3", "target": "SOCS3"}]).encode("utf-8")
+
+    # Setup context manager mock for urlopen
+    mock_urlopen.return_value.__enter__.return_value = mock_response
+
+    # Setup mock request instance
+    mock_req_instance = MagicMock()
+    mock_request_class.return_value = mock_req_instance
+
+    client = OmniPathClient(base_url="https://omnipathdb.org", timeout_seconds=10.0)
+    result = client.fetch_interactions(genes)
+
+    # Verify the results are correctly parsed
+    assert result == [{"source": "STAT3", "target": "SOCS3"}]
+
+    # Verify URL construction and query params
+    # Expected genes csv = "SOCS3,STAT3" (sorted, unique)
+    expected_query = "genesymbols=1&fields=sources%2Creferences%2Ccuration_effort%2Cdorothea_level%2Ctype&format=json&sources=SOCS3%2CSTAT3&targets=SOCS3%2CSTAT3"
+    expected_url = f"https://omnipathdb.org/interactions/?{expected_query}"
+
+    mock_request_class.assert_called_once_with(
+        url=expected_url,
+        method="GET",
+    )
+
+    # Verify urlopen called correctly
+    mock_urlopen.assert_called_once_with(mock_req_instance, timeout=10.0)
