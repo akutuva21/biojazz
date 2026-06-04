@@ -19,7 +19,9 @@ def test_copy_metadata_isolation(seed_network):
 
 
 def test_from_dict_missing_key_raises_helpful_error():
-    with pytest.raises(ReactionNetworkValidationError, match="missing required key 'name'"):
+    with pytest.raises(
+        ReactionNetworkValidationError, match="missing required key 'name'"
+    ):
         ReactionNetwork.from_dict(
             {
                 "proteins": {"P1": {"sites": []}},

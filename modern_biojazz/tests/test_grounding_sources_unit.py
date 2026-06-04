@@ -27,7 +27,9 @@ def test_build_grounding_payload_empty():
     omnipath_rows: List[Dict[str, Any]] = []
     indra_statements: List[Dict[str, Any]] = []
 
-    payload = build_grounding_payload_from_sources(abstract_types, omnipath_rows, indra_statements)
+    payload = build_grounding_payload_from_sources(
+        abstract_types, omnipath_rows, indra_statements
+    )
 
     assert payload["abstract_types"] == {}
     assert payload["real_nodes"] == []
@@ -48,15 +50,17 @@ def test_build_grounding_payload_logic():
     indra_statements = [
         {
             "agents": [{"name": "STAT3_HUMAN"}, {"name": "SOCS3_HUMAN"}],
-            "type": "Phosphorylation"
+            "type": "Phosphorylation",
         },
         {
             "agents": [{"name": "STAT3ABC"}, {"name": "SOCS3"}],
             # missing type should default to binding
-        }
+        },
     ]
 
-    payload = build_grounding_payload_from_sources(abstract_types, omnipath_rows, indra_statements)
+    payload = build_grounding_payload_from_sources(
+        abstract_types, omnipath_rows, indra_statements
+    )
 
     # Verify nodes and type inference
     nodes = {n["name"]: n for n in payload["real_nodes"]}

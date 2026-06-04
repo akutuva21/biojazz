@@ -38,7 +38,9 @@ class INDRAClient:
     base_url: str = "https://api.indra.bio"
     timeout_seconds: float = 45.0
 
-    def fetch_statements(self, genes: List[str], stmt_type: str = "Phosphorylation") -> List[Dict[str, Any]]:
+    def fetch_statements(
+        self, genes: List[str], stmt_type: str = "Phosphorylation"
+    ) -> List[Dict[str, Any]]:
         payload = {
             "subject": genes,
             "object": genes,
@@ -82,7 +84,9 @@ def build_grounding_payload_from_sources(
         return "unknown"
 
     def confidence_for_pair(abstract_name: str, node_name: str) -> float:
-        if node_name.upper() == abstract_name.upper() or node_name.upper().startswith(f"{abstract_name.upper()}_"):
+        if node_name.upper() == abstract_name.upper() or node_name.upper().startswith(
+            f"{abstract_name.upper()}_"
+        ):
             return 0.95
         if node_name.upper().startswith(abstract_name.upper()):
             return 0.8
@@ -115,7 +119,9 @@ def build_grounding_payload_from_sources(
 
     for abstract in abstract_types.keys():
         for node in real_nodes:
-            confidence_by_pair[f"{abstract}->{node['name']}"] = confidence_for_pair(abstract, node["name"])
+            confidence_by_pair[f"{abstract}->{node['name']}"] = confidence_for_pair(
+                abstract, node["name"]
+            )
 
     return {
         "abstract_types": abstract_types,

@@ -9,8 +9,9 @@ from typing import List, Protocol
 
 
 class ActionProposer(Protocol):
-    def propose(self, model_code: str, action_names: List[str], budget: int) -> List[str]:
-        ...
+    def propose(
+        self, model_code: str, action_names: List[str], budget: int
+    ) -> List[str]: ...
 
 
 @dataclass
@@ -25,8 +26,14 @@ class OpenAICompatibleProposer:
     max_feedback_items: int = 8
     feedback_log: List[str] | None = None
 
-    def propose(self, model_code: str, action_names: List[str], budget: int) -> List[str]:
-        recent_feedback = [] if self.feedback_log is None else self.feedback_log[-self.max_feedback_items :]
+    def propose(
+        self, model_code: str, action_names: List[str], budget: int
+    ) -> List[str]:
+        recent_feedback = (
+            []
+            if self.feedback_log is None
+            else self.feedback_log[-self.max_feedback_items :]
+        )
         prompt = {
             "role": "user",
             "content": (
@@ -59,7 +66,9 @@ class OpenAICompatibleProposer:
                     },
                     method="POST",
                 )
-                with urllib.request.urlopen(req, timeout=self.timeout_seconds) as response:
+                with urllib.request.urlopen(
+                    req, timeout=self.timeout_seconds
+                ) as response:
                     raw = json.loads(response.read().decode("utf-8"))
                 break
             except Exception as exc:
@@ -69,7 +78,9 @@ class OpenAICompatibleProposer:
                     continue
                 break
         if raw is None:
-            raise RuntimeError(f"OpenAI-compatible proposer request failed: {last_error}") from last_error
+            raise RuntimeError(
+                f"OpenAI-compatible proposer request failed: {last_error}"
+            ) from last_error
 
         content = raw["choices"][0]["message"]["content"]
         data = self._parse_json_from_text(content)
@@ -119,7 +130,9 @@ class SafeActionFilterProposer:
 
     inner: ActionProposer
 
-    def propose(self, model_code: str, action_names: List[str], budget: int) -> List[str]:
+    def propose(
+        self, model_code: str, action_names: List[str], budget: int
+    ) -> List[str]:
         allowed = set(action_names)
         proposed = self.inner.propose(model_code, action_names, budget)
         filtered = [a for a in proposed if a in allowed]
