@@ -9,7 +9,7 @@
 #               the network to compute all signals
 #
 #        FILES: Scoring.pm, Stimulus.pm, MatlabDriver.pm, GenomeModel.pm
-#         BUGS: Newly created
+#         BUGS: ---
 #        NOTES: Need to implement different types of signaling dynamics: adaptation
 #               , ultrasensitivity, (damped) oscillation?
 #               Ideally, if we could associate the dynamics with real biological
@@ -914,7 +914,7 @@ use base qw(Scoring);
         # REMOVE FILES
         #---------------------------------------------------------
         if (defined $local_dir) {
-            `echo $local_dir/matlab/${genome_name}*     | xargs rm -f`;
+            unlink glob "$local_dir/matlab/${genome_name}*";
         }
 
 
