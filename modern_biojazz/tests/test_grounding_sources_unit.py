@@ -1,7 +1,25 @@
 from __future__ import annotations
 
+import json
+from pathlib import Path
 from typing import Any, Dict, List
-from modern_biojazz.grounding_sources import build_grounding_payload_from_sources
+from modern_biojazz.grounding_sources import build_grounding_payload_from_sources, load_grounding_snapshot
+
+
+def test_load_grounding_snapshot(tmp_path: Path):
+    snapshot_data = {"test_key": "test_value", "nodes": [1, 2, 3]}
+    file_path = tmp_path / "snapshot.json"
+
+    with open(file_path, "w", encoding="utf-8") as f:
+        json.dump(snapshot_data, f)
+
+    # Test with string path
+    result_str = load_grounding_snapshot(str(file_path))
+    assert result_str == snapshot_data
+
+    # Test with Path object
+    result_path = load_grounding_snapshot(file_path)
+    assert result_path == snapshot_data
 
 
 def test_build_grounding_payload_empty():

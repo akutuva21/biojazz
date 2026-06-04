@@ -208,7 +208,6 @@ use base qw(Parser);
 
 
 sub run_testcases {
-    use Data::Dumper;
 
     srand(365345);
     my $seq_ref = Sequence->new({});
@@ -320,7 +319,6 @@ sub run_testcases {
                 },
             ],
         });
-    printn Dumper($untranslated_ref);
     my $untranscribed_ref = $ref->untranscribe($untranslated_ref);
     printn $untranscribed_ref->get_sequence();
     my $irref = $ref->parse(sequence_ref => $untranscribed_ref);

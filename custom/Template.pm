@@ -89,9 +89,24 @@ use base qw(Scoring);
                         RT_phi => 0.55,
                         protodomains => [
                             {
-                                type => "bsite",
+                                type => "msite",
                                 substrate_polarity => 1,
                                 binding_profile => "101", # chosen to match first gene
+                                kf_profile => "0011",
+                                kb_profile => "111011",
+                                kp_profile => "100011",
+                                Keq_ratio => 1.0e-1,
+                                kf_polarity_mask => "0000",
+                                kb_polarity_mask => "110011",
+                                kf_conformation_mask => "1111",
+                                kb_conformation_mask => "001100",
+                                kp_conformation_mask => "010101",
+                                UNUSED => "1100000001",
+                            },
+                            {
+                                type => "csite",
+                                substrate_polarity => 0,
+                                binding_profile => "101",
                                 kf_profile => "0011",
                                 kb_profile => "111011",
                                 kp_profile => "100011",
@@ -135,11 +150,6 @@ use base qw(Scoring);
         # TRANSLATE GENOME
         #---------------------------------------------------------
         $genome_model_ref->translate();
-        # hack first protodomain to make it an msite
-        my @pd_refs = $genome_model_ref->get_protodomain_parser_ref()->get_object_instances();
-        $pd_refs[0]->get_translation_ref()->{type} = "msite";
-        # hack second protodomain to make it phosphorylate the first msite
-        $pd_refs[1]->get_translation_ref()->{substrate_polarity} = 0;
 
         #---------------------------------------------------------
         # BUILD NETWORK
