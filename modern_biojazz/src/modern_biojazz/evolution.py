@@ -97,11 +97,17 @@ class LLMEvolutionEngine:
 
     def _mutate_candidate(self, network: ReactionNetwork, budget: int) -> ReactionNetwork:
         last_child: ReactionNetwork | None = None
+        # Cache model_code and action keys to avoid redundant computation in loop
+        base_model_code = self._model_code(network)
+        base_action_keys = list(self.mutator.action_library(network).keys())
+
         for _ in range(8):
             child = network.copy()
             last_child = child
+            # Propose fresh choices each loop iteration for diversity
+            choices = self.proposer.propose(base_model_code, base_action_keys, budget)
+            # Fetch actions using the child to avoid modifying the original network
             actions = self.mutator.action_library(child)
-            choices = self.proposer.propose(self._model_code(child), list(actions.keys()), budget)
             for action_name in choices:
                 action = actions.get(action_name)
                 if action is not None:
