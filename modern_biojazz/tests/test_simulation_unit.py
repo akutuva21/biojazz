@@ -34,14 +34,24 @@ def test_catalyst_http_client_error_path(seed_network):
 def test_fitness_evaluator_accepts_backend_network(seed_network):
     engine = LocalCatalystEngine()
     evaluator = FitnessEvaluator(target_output=1.0)
-    score = evaluator.score(backend=engine, network=seed_network, t_end=5.0, dt=1.0)
+    from modern_biojazz.simulation import SimulationConfig
+
+    score = evaluator.score(
+        backend=engine, network=seed_network, config=SimulationConfig(t_end=5.0, dt=1.0)
+    )
     assert score >= 0.0
 
 
 def test_ultrasensitive_evaluator_matches_unified_interface(seed_network):
     engine = LocalCatalystEngine()
-    evaluator = UltrasensitiveFitnessEvaluator(input_species="STAT3", output_species="SOCS3")
-    score = evaluator.score(backend=engine, network=seed_network, t_end=5.0, dt=1.0)
+    evaluator = UltrasensitiveFitnessEvaluator(
+        input_species="STAT3", output_species="SOCS3"
+    )
+    from modern_biojazz.simulation import SimulationConfig
+
+    score = evaluator.score(
+        backend=engine, network=seed_network, config=SimulationConfig(t_end=5.0, dt=1.0)
+    )
     assert score >= 0.0
 
 

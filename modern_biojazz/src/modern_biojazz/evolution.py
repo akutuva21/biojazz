@@ -7,12 +7,13 @@ from typing import Callable, List, Protocol
 
 from .mutation import GraphMutator
 from .site_graph import ReactionNetwork
-from .simulation import SimulationBackend, FitnessScorer
+from .simulation import SimulationBackend, FitnessScorer, SimulationConfig
 
 
 class LLMProposer(Protocol):
-    def propose(self, model_code: str, action_names: List[str], budget: int) -> List[str]:
-        ...
+    def propose(
+        self, model_code: str, action_names: List[str], budget: int
+    ) -> List[str]: ...
 
 
 @dataclass
@@ -53,7 +54,9 @@ class LLMEvolutionEngine:
         self.candidate_filter = candidate_filter
         self.filter_rejection_count = 0
 
-    def _cegis_feedback(self, network: ReactionNetwork, score: float, failure_type: str, details: dict) -> None:
+    def _cegis_feedback(
+        self, network: ReactionNetwork, score: float, failure_type: str, details: dict
+    ) -> None:
         if not hasattr(self.proposer, "record_feedback"):
             return
 
@@ -95,7 +98,9 @@ class LLMEvolutionEngine:
             f"rules_preview={preview_rules}"
         )
 
-    def _mutate_candidate(self, network: ReactionNetwork, budget: int) -> ReactionNetwork:
+    def _mutate_candidate(
+        self, network: ReactionNetwork, budget: int
+    ) -> ReactionNetwork:
         last_child: ReactionNetwork | None = None
         # Cache model_code and action keys to avoid redundant computation in loop
         base_model_code = self._model_code(network)
@@ -137,18 +142,23 @@ class LLMEvolutionEngine:
                 if self.candidate_filter is None or self.candidate_filter(safe):
                     return safe
 
-        if last_child is not None and (self.candidate_filter is None or self.candidate_filter(last_child)):
+        if last_child is not None and (
+            self.candidate_filter is None or self.candidate_filter(last_child)
+        ):
             return last_child
         return network.copy()
 
     def _evaluate(self, network: ReactionNetwork, config: EvolutionConfig) -> float:
         try:
-            score = self.fitness.score(
-                backend=self.backend,
-                network=network,
+            sim_config = SimulationConfig(
                 t_end=config.sim_t_end,
                 dt=config.sim_dt,
                 solver=config.sim_solver,
+            )
+            score = self.fitness.score(
+                backend=self.backend,
+                network=network,
+                config=sim_config,
             )
         except Exception as error:
             self._cegis_feedback(
@@ -194,15 +204,21 @@ class LLMEvolutionEngine:
                     best_score = island_best_score
                     best = island_best.copy()
 
-                survivors = [n for _, n in scored[: max(2, config.population_size // 3)]]
+                survivors = [
+                    n for _, n in scored[: max(2, config.population_size // 3)]
+                ]
                 new_pop: List[ReactionNetwork] = [island_best.copy()]
                 while len(new_pop) < config.population_size:
                     parent = self.rng.choice(survivors)
-                    child = self._mutate_candidate(parent, config.mutations_per_candidate)
+                    child = self._mutate_candidate(
+                        parent, config.mutations_per_candidate
+                    )
                     new_pop.append(child)
                 islands[island_idx] = new_pop
 
-            if (generation + 1) % max(1, config.migration_interval) == 0 and len(islands) > 1:
+            if (generation + 1) % max(1, config.migration_interval) == 0 and len(
+                islands
+            ) > 1:
                 self._migrate(islands, config.migration_count)
 
             if hasattr(self.proposer, "record_feedback"):
@@ -210,12 +226,18 @@ class LLMEvolutionEngine:
 
             history.append(best_score)
 
-        return EvolutionResult(best_network=best, best_score=best_score, history=history)
+        return EvolutionResult(
+            best_network=best, best_score=best_score, history=history
+        )
 
-    def _migrate(self, islands: List[List[ReactionNetwork]], migration_count: int) -> None:
+    def _migrate(
+        self, islands: List[List[ReactionNetwork]], migration_count: int
+    ) -> None:
         migrants_by_island: List[List[ReactionNetwork]] = []
         for pop in islands:
-            migrants = [self.rng.choice(pop).copy() for _ in range(max(1, migration_count))]
+            migrants = [
+                self.rng.choice(pop).copy() for _ in range(max(1, migration_count))
+            ]
             migrants_by_island.append(migrants)
 
         for idx, pop in enumerate(islands):
@@ -232,7 +254,9 @@ class DeterministicProposer:
     cursor: int = 0
     feedback_log: List[str] | None = None
 
-    def propose(self, model_code: str, action_names: List[str], budget: int) -> List[str]:
+    def propose(
+        self, model_code: str, action_names: List[str], budget: int
+    ) -> List[str]:
         if not action_names:
             return []
         out: List[str] = []

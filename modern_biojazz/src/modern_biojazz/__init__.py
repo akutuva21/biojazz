@@ -1,6 +1,19 @@
-from .site_graph import ReactionNetwork, Protein, Site, Rule, ReactionNetworkValidationError
+from .site_graph import (
+    ReactionNetwork,
+    Protein,
+    Site,
+    Rule,
+    ReactionNetworkValidationError,
+)
 from .mutation import GraphMutator
-from .simulation import CatalystHTTPClient, LocalCatalystEngine, FitnessEvaluator, UltrasensitiveFitnessEvaluator, FitnessScorer
+from .simulation import (
+    CatalystHTTPClient,
+    LocalCatalystEngine,
+    FitnessEvaluator,
+    UltrasensitiveFitnessEvaluator,
+    FitnessScorer,
+    SimulationConfig,
+)
 from .evolution import EvolutionConfig, LLMEvolutionEngine, EvolutionResult
 from .grounding import GroundingEngine, GroundingResult
 from .grounding_sources import (
@@ -25,6 +38,7 @@ __all__ = [
     "FitnessEvaluator",
     "UltrasensitiveFitnessEvaluator",
     "FitnessScorer",
+    "SimulationConfig",
     "EvolutionConfig",
     "LLMEvolutionEngine",
     "EvolutionResult",
