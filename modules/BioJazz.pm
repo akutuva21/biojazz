@@ -390,7 +390,7 @@ sub collect_info_from_networks {
 
 
 #--------------------------------------------------------------------------------------
-# Function: xxx_history
+# Function: collect_history_from_genomes
 # Synopsys: 
 #--------------------------------------------------------------------------------------
 sub collect_history_from_genomes {
