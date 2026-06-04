@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import random
 from dataclasses import dataclass
-from typing import Callable, Dict
+from typing import Callable, Dict, Union
 
 from .site_graph import ReactionNetwork, Protein, Site, Rule
 
@@ -18,6 +18,8 @@ class GraphMutator:
 
     def __init__(self, rng: random.Random | None = None) -> None:
         self.rng = rng or random.Random()
+        self._rule_counter = 0
+        self._protein_counter = 0
 
     def _add_species_if_missing(
         self, network: ReactionNetwork, species_name: str
@@ -62,10 +64,13 @@ class GraphMutator:
             return True
         return False
 
-    def add_protein(
-        self, network: ReactionNetwork, protein_name: str | None = None
-    ) -> None:
-        protein_name = protein_name or f"P{len(network.proteins) + 1}"
+    def add_protein(self, network: ReactionNetwork, protein_name: str | None = None) -> None:
+        if not protein_name:
+            self._protein_counter += 1
+            protein_name = f"P{self._protein_counter}"
+            while protein_name in network.proteins:
+                self._protein_counter += 1
+                protein_name = f"P{self._protein_counter}"
         if protein_name in network.proteins:
             return
         network.proteins[protein_name] = Protein(name=protein_name, sites=[])
@@ -118,7 +123,8 @@ class GraphMutator:
             return
         if not self._binding_is_compatible(network, a, b):
             return
-        rname = f"bind_{a}_{b}_{len(network.rules)+1}"
+        self._rule_counter += 1
+        rname = f"bind_{a}_{b}_{self._rule_counter}"
         complex_species = f"{a}:{b}"
         self._add_species_if_missing(network, complex_species)
         network.rules.append(
@@ -136,7 +142,8 @@ class GraphMutator:
     ) -> None:
         if kinase not in network.proteins or substrate not in network.proteins:
             return
-        rname = f"phos_{kinase}_{substrate}_{len(network.rules)+1}"
+        self._rule_counter += 1
+        rname = f"phos_{kinase}_{substrate}_{self._rule_counter}"
         phospho = f"{substrate}_P"
         self._add_species_if_missing(network, phospho)
         network.rules.append(
@@ -158,7 +165,8 @@ class GraphMutator:
     ) -> None:
         if phosphatase not in network.proteins or substrate not in network.proteins:
             return
-        rname = f"dephos_{phosphatase}_{substrate}_{len(network.rules)+1}"
+        self._rule_counter += 1
+        rname = f"dephos_{phosphatase}_{substrate}_{self._rule_counter}"
         phospho = f"{substrate}_P"
         self._add_species_if_missing(network, phospho)
         network.rules.append(
@@ -176,7 +184,8 @@ class GraphMutator:
     ) -> None:
         if activator not in network.proteins or target not in network.proteins:
             return
-        rname = f"act_{activator}_{target}_{len(network.rules)+1}"
+        self._rule_counter += 1
+        rname = f"act_{activator}_{target}_{self._rule_counter}"
         activated = f"{target}_act"
         self._add_species_if_missing(network, activated)
         network.rules.append(
@@ -194,7 +203,8 @@ class GraphMutator:
     ) -> None:
         if protein not in network.proteins:
             return
-        rname = f"syn_{protein}_{len(network.rules)+1}"
+        self._rule_counter += 1
+        rname = f"syn_{protein}_{self._rule_counter}"
         self._add_species_if_missing(network, protein)
         network.rules.append(
             Rule(
@@ -211,7 +221,8 @@ class GraphMutator:
     ) -> None:
         if protein not in network.proteins:
             return
-        rname = f"deg_{protein}_{len(network.rules)+1}"
+        self._rule_counter += 1
+        rname = f"deg_{protein}_{self._rule_counter}"
         self._add_species_if_missing(network, protein)
         network.rules.append(
             Rule(
@@ -228,7 +239,8 @@ class GraphMutator:
     ) -> None:
         if inhibitor not in network.proteins or target not in network.proteins:
             return
-        rname = f"inh_{inhibitor}_{target}_{len(network.rules)+1}"
+        self._rule_counter += 1
+        rname = f"inh_{inhibitor}_{target}_{self._rule_counter}"
         inhibited = f"{target}_inh"
         self._add_species_if_missing(network, inhibited)
         network.rules.append(
@@ -267,14 +279,16 @@ class GraphMutator:
     def remove_rule(self, network: ReactionNetwork, rule_name: str) -> None:
         network.rules = [r for r in network.rules if r.name != rule_name]
 
-    def modify_rate(
-        self, network: ReactionNetwork, rule_name: str, multiplier: float
-    ) -> None:
-        for r in network.rules:
-            if r.name == rule_name:
-                new_rate = r.rate * multiplier
-                r.rate = min(100.0, max(1e-6, new_rate))
-                return
+    def modify_rate(self, network: ReactionNetwork, rule_or_name: Union[Rule, str], multiplier: float) -> None:
+        if isinstance(rule_or_name, Rule):
+            new_rate = rule_or_name.rate * multiplier
+            rule_or_name.rate = min(100.0, max(1e-6, new_rate))
+        else:
+            for r in network.rules:
+                if r.name == rule_or_name:
+                    new_rate = r.rate * multiplier
+                    r.rate = min(100.0, max(1e-6, new_rate))
+                    return
 
     def duplicate_protein_with_rewiring(
         self, network: ReactionNetwork, protein_name: str
@@ -335,10 +349,8 @@ class GraphMutator:
                 if partner not in bind_sites[0].allowed_partners:
                     bind_sites[0].allowed_partners.append(partner)
 
-    def action_library(
-        self, network: ReactionNetwork | None = None
-    ) -> Dict[str, MutationAction]:
-        if getattr(self, "_action_dict", None) is not None:
+    def action_library(self, network: ReactionNetwork | None = None) -> Dict[str, MutationAction]:
+        if hasattr(self, "_action_dict"):
             return self._action_dict
 
         def random_add_site(net: ReactionNetwork) -> None:
@@ -429,7 +441,7 @@ class GraphMutator:
             target = self.rng.choice(net.rules)
             # Log-uniform jitter around 1.0 keeps multiplicative updates stable.
             multiplier = 10 ** self.rng.uniform(-0.2, 0.2)
-            self.modify_rate(net, target.name, multiplier)
+            self.modify_rate(net, target, multiplier)
 
         def random_remove_site(net: ReactionNetwork) -> None:
             candidates = [
