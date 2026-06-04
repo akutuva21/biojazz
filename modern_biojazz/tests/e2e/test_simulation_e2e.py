@@ -4,7 +4,11 @@ import json
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
-from modern_biojazz.simulation import CatalystHTTPClient, FitnessEvaluator, LocalCatalystEngine
+from modern_biojazz.simulation import (
+    CatalystHTTPClient,
+    FitnessEvaluator,
+    LocalCatalystEngine,
+)
 
 
 class _Handler(BaseHTTPRequestHandler):
@@ -15,7 +19,10 @@ class _Handler(BaseHTTPRequestHandler):
         rules = payload["network"]["rules"]
         response = {
             "solver": payload["solver"],
-            "trajectory": [{"t": 0.0, "output": 0.1}, {"t": payload["t_end"], "output": 1.0}],
+            "trajectory": [
+                {"t": 0.0, "output": 0.1},
+                {"t": payload["t_end"], "output": 1.0},
+            ],
             "stats": {"n_rules": len(rules), "n_species": 2, "stiff": True},
         }
         body = json.dumps(response).encode("utf-8")

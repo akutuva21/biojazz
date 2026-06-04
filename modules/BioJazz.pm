@@ -45,6 +45,7 @@ use Module::Load;
 
 use Utils;
 use Globals qw ($verbosity $TAG $config_ref);
+use Module::Load qw(load);
 
 use GenAlg;
 use History;
@@ -242,7 +243,7 @@ sub score_genome {
     if ($@) {print $@; return;}
     my $analysis_dir = defined $config_ref->{analysis_dir} ? $config_ref->{analysis_dir} : "analysis";
 
-    $scoring_ref = $config_ref->{scoring_class}->new({
+    $scoring_ref = $scoring_class->new({
             node_ID => 999,
             config_file => $config_ref->{config_file},
             work_dir => "$config_ref->{work_dir}/$analysis_dir/$TAG",
@@ -284,7 +285,7 @@ sub score_generation {
     eval { load $config_ref->{scoring_class}; };
     if ($@) {print $@; return;}
 
-    $scoring_ref = $config_ref->{scoring_class}->new({
+    $scoring_ref = $scoring_class->new({
             node_ID => 999,
             config_file => $config_ref->{config_file},
             work_dir => "$config_ref->{work_dir}/$analysis_dir/$TAG",
@@ -335,7 +336,7 @@ sub rescore_genomes {
     if ($@) {print $@; return;}
     my $analysis_dir = defined $config_ref->{analysis_dir} ? $config_ref->{analysis_dir} : "analysis";
 
-    $scoring_ref = $config_ref->{scoring_class}->new({
+    $scoring_ref = $scoring_class->new({
             node_ID => 999,
             config_file => $config_ref->{config_file},
             work_dir => "$config_ref->{work_dir}/$analysis_dir/$TAG",

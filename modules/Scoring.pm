@@ -20,6 +20,8 @@ use base qw();
     use Carp;
     use Utils;
     use Globals qw($verbosity $TAG $WORKSPACE);
+    use File::Path qw(make_path);
+    use File::Copy qw(move);
 
     use MatlabDriver;
 
@@ -103,8 +105,8 @@ use base qw();
         my $work_dir = $work_dir_of{$obj_ID};
         my $local_dir = $local_dir_of{$obj_ID};
         my $matlab_work = $matlab_work_of{$obj_ID} = defined $local_dir ? "$local_dir/matlab" : "$work_dir/matlab";
-        system("mkdir -p $work_dir/matlab");
-        system("mkdir -p $local_dir/matlab") if defined $local_dir;
+        make_path("$work_dir/matlab");
+        make_path("$local_dir/matlab") if defined $local_dir;
         my $logfile = $logfile_of{$obj_ID} = "matlab.$node_ID.log";
         my $matlab_ref = $matlab_ref_of{$obj_ID} = MatlabDriver->new({
                 name => "matlab($node_ID)",
@@ -150,7 +152,7 @@ use base qw();
         $matlab_ref_of{$obj_ID} = undef; # shut down matlab
         if (defined $local_dir) {
             printn "Moving $matlab_work/$logfile to $work_dir/matlab";
-            system("mv $matlab_work/$logfile $work_dir/matlab");
+            move("$matlab_work/$logfile", "$work_dir/matlab");
             printn "Done moving.";
         }
 
@@ -268,29 +270,30 @@ use base qw();
 
 
         #    my $facile_cmd = "$ENV{FACILE_HOME}/facile.pl -q ";
-        my $facile_cmd = "$ENV{FACILE_HOME}/facile.pl ". ($args{VERBOSE} ? "--verbose " : "");
+        my @facile_cmd = ("$ENV{FACILE_HOME}/facile.pl");
+        push @facile_cmd, "--verbose" if $args{VERBOSE};
         if ($sim_type =~ "matlab") {
-            $facile_cmd .= " --matlab";
-            $facile_cmd .= " --solver $solver" if $solver ne "UNDEF";
-            $facile_cmd .= " --events \"$args{T_EVENTS}\"" if ($args{T_EVENTS} ne "UNDEF");
-            $facile_cmd .= " --solver_options \"$solver_options\"" if ($solver_options ne "UNDEF");
-            $facile_cmd .= " --t_tick $tk " if $tk ne "UNDEF";
-            $facile_cmd .= " --t_final $tf " if $tf ne "UNDEF";
-            $facile_cmd .= " --t_sampling \"$t_sampling\" " if $t_sampling ne "UNDEF";
-            $facile_cmd .= " --split " if $split_flag;
-            $facile_cmd .= " $eqn_file";
+            push @facile_cmd, "--matlab";
+            push @facile_cmd, "--solver", $solver if $solver ne "UNDEF";
+            push @facile_cmd, "--events", $args{T_EVENTS} if ($args{T_EVENTS} ne "UNDEF");
+            push @facile_cmd, "--solver_options", $solver_options if ($solver_options ne "UNDEF");
+            push @facile_cmd, "--t_tick", $tk if $tk ne "UNDEF";
+            push @facile_cmd, "--t_final", $tf if $tf ne "UNDEF";
+            push @facile_cmd, "--t_sampling", $t_sampling if $t_sampling ne "UNDEF";
+            push @facile_cmd, "--split" if $split_flag;
+            push @facile_cmd, $eqn_file;
         } elsif ($sim_type eq "easystoch") {
-            # 	     $facile_cmd .= " --easystoch";
+            # 	     push @facile_cmd, "--easystoch";
             # 	     if ($args{T_EVENTS} ne "") {
-            # 		 $facile_cmd .= " --events \"$args{T_EVENTS}\"";
+            # 		 push @facile_cmd, "--events", $args{T_EVENTS};
             # 	     }
-            # 	     $facile_cmd .= " -C $cell_volume $eqn_file";
+            # 	     push @facile_cmd, "-C", $cell_volume, $eqn_file;
         } else {
             printn "ERROR: unsupported sim_type \"$sim_type\"";
             exit;
         }
 
-        printn "facile_run: facile command is $facile_cmd";
+        printn "facile_run: facile command is " . join(" ", @facile_cmd);
         printn "facile_run: started facile on " . `date`;
         system("$facile_cmd");
         my $facile_status = $?;
