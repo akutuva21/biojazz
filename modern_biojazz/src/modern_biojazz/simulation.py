@@ -52,10 +52,7 @@ class FitnessScorer(Protocol):
         *,
         backend: SimulationBackend | None = None,
         network: ReactionNetwork | None = None,
-        t_end: float = 20.0,
-        dt: float = 1.0,
-        solver: str = "Rodas5P",
-        initial_conditions: Dict[str, float] | None = None,
+        config: SimulationConfig | None = None,
     ) -> float: ...
 
 
@@ -109,14 +106,9 @@ class CatalystHTTPClient:
 class LocalCatalystEngine:
     """Mass-action stepping engine for local integration tests and baseline scoring."""
 
-    def simulate(
-        self,
-        network: ReactionNetwork,
-        t_end: float,
-        dt: float,
-        solver: str = "FBDF",
-        initial_conditions: Dict[str, float] | None = None,
-    ) -> Dict[str, Any]:
+    def _prepare_initial_state(
+        self, network: ReactionNetwork, initial_conditions: Dict[str, float] | None
+    ) -> tuple[list[str], dict[str, int], list[float]]:
         species_order = list(network.proteins.keys())
         seen = set(species_order)
         for rule in network.rules:
@@ -130,10 +122,12 @@ class LocalCatalystEngine:
         if initial_conditions:
             for name, value in initial_conditions.items():
                 if name not in index:
+                    seen.add(name)
                     species_order.append(name)
                     index[name] = len(y0)
                     y0.append(0.0)
                 y0[index[name]] = float(value)
+        return species_order, index, y0
 
         rates = [max(1e-8, float(r.rate)) for r in network.rules] or [1e-8]
         stiffness_proxy = (max(rates) / min(rates)) > 100.0
@@ -173,11 +167,9 @@ class LocalCatalystEngine:
                     for idx, count in stoich:
                         dydt[idx] += flux * count
             return dydt
+        return rhs
 
-        trajectory = []
-        y_series = None
-        used_solver = solver
-
+    def _run_solver(self, rhs: Any, y0: list[float], t_end: float, dt: float, t_eval: list[float], solver: str) -> tuple[list[list[float]], str]:
         solve_ivp = None
         try:
             from scipy.integrate import solve_ivp as _solve_ivp  # type: ignore
@@ -199,8 +191,7 @@ class LocalCatalystEngine:
             )
             if not solved.success or solved.y is None:
                 raise RuntimeError(f"BDF solve failed: {solved.message}")
-            y_series = solved.y
-            used_solver = "BDF"
+            return solved.y, "BDF"
         else:
             # Fallback keeps local execution available when SciPy is not present.
             current = list(y0)
@@ -211,8 +202,10 @@ class LocalCatalystEngine:
                 snapshots.append(list(current))
             # Shape contract for both solver paths: y_series[species_index][time_index].
             y_series = [list(col) for col in zip(*snapshots)]
-            used_solver = "EulerFallback"
+            return y_series, "EulerFallback"
 
+    def _build_trajectory(self, network: ReactionNetwork, species_order: list[str], index: dict[str, int], y_series: list[list[float]], t_eval: list[float]) -> list[Dict[str, Any]]:
+        trajectory = []
         output_species = network.metadata.get("output_species")
         if output_species not in index:
             output_species = species_order[0] if species_order else ""
@@ -229,6 +222,27 @@ class LocalCatalystEngine:
                     "species": LazySpeciesMap(y_series, index, species_order, ti),
                 }
             )
+        return trajectory
+
+    def simulate(
+        self,
+        network: ReactionNetwork,
+        t_end: float,
+        dt: float,
+        solver: str = "FBDF",
+        initial_conditions: Dict[str, float] | None = None,
+    ) -> Dict[str, Any]:
+        species_order, index, y0 = self._prepare_initial_state(network, initial_conditions)
+
+        rates = [max(1e-8, float(r.rate)) for r in network.rules] or [1e-8]
+        stiffness_proxy = (max(rates) / min(rates)) > 100.0
+        t_eval = [i * dt for i in range(int(t_end / dt) + 1)]
+
+        rhs = self._make_rhs(network, index)
+
+        y_series, used_solver = self._run_solver(rhs, y0, t_end, dt, t_eval, solver)
+
+        trajectory = self._build_trajectory(network, species_order, index, y_series, t_eval)
 
         return {
             "solver": used_solver,
@@ -251,11 +265,10 @@ class FitnessEvaluator:
         *,
         backend: SimulationBackend | None = None,
         network: ReactionNetwork | None = None,
-        t_end: float = 20.0,
-        dt: float = 1.0,
-        solver: str = "Rodas5P",
-        initial_conditions: Dict[str, float] | None = None,
+        config: SimulationConfig | None = None,
     ) -> float:
+        if config is None:
+            config = SimulationConfig()
         if simulation_result is None:
             if backend is None or network is None:
                 raise ValueError(
@@ -263,10 +276,10 @@ class FitnessEvaluator:
                 )
             simulation_result = backend.simulate(
                 network,
-                t_end=t_end,
-                dt=dt,
-                solver=solver,
-                initial_conditions=initial_conditions,
+                t_end=config.t_end,
+                dt=config.dt,
+                solver=config.solver,
+                initial_conditions=config.initial_conditions,
             )
 
         trajectory = simulation_result.get("trajectory", [])
@@ -292,23 +305,22 @@ class UltrasensitiveFitnessEvaluator:
         *,
         backend: SimulationBackend | None = None,
         network: ReactionNetwork | None = None,
-        t_end: float = 30.0,
-        dt: float = 0.5,
-        solver: str = "Rodas5P",
-        _initial_conditions: Dict[str, float] | None = None,
+        config: SimulationConfig | None = None,
     ) -> float:
         if backend is None or network is None:
             raise ValueError(
                 "UltrasensitiveFitnessEvaluator requires backend and network."
             )
+        if config is None:
+            config = SimulationConfig(t_end=30.0, dt=0.5)
 
         responses = []
         for dose in self.doses:
             result = backend.simulate(
                 network,
-                t_end=t_end,
-                dt=dt,
-                solver=solver,
+                t_end=config.t_end,
+                dt=config.dt,
+                solver=config.solver,
                 initial_conditions={self.input_species: dose},
             )
             series = result.get("trajectory", [])

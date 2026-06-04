@@ -12,6 +12,7 @@ from .simulation import (
     FitnessEvaluator,
     UltrasensitiveFitnessEvaluator,
     FitnessScorer,
+    SimulationConfig,
 )
 from .evolution import EvolutionConfig, LLMEvolutionEngine, EvolutionResult
 from .grounding import GroundingEngine, GroundingResult
@@ -37,6 +38,7 @@ __all__ = [
     "FitnessEvaluator",
     "UltrasensitiveFitnessEvaluator",
     "FitnessScorer",
+    "SimulationConfig",
     "EvolutionConfig",
     "LLMEvolutionEngine",
     "EvolutionResult",
