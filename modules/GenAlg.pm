@@ -35,6 +35,7 @@ use base qw();
 
 
     use FindBin qw($Bin);  # need application path
+    use Module::Load;
 
     #######################################################################################
     # CLASS ATTRIBUTES
@@ -203,7 +204,7 @@ use base qw();
                     undef);
                 my $defined_local_dir = (defined $local_dir) ? "$local_dir/$TAG" : undef;
 
-                eval("use $config_ref->{scoring_class};");
+                eval { load $config_ref->{scoring_class}; };
                 if ($@) {print $@; return;}
 
                 my $scoring_ref = $config_ref->{scoring_class}->new({
@@ -301,7 +302,7 @@ use base qw();
                     undef);
                 my $defined_local_dir = (defined $local_dir) ? "$local_dir/$TAG" : undef;
 
-                eval("use $config_ref->{scoring_class};");
+                eval { load $config_ref->{scoring_class}; };
                 if ($@) {print $@; return;}
 
                 my $scoring_ref = $config_ref->{scoring_class}->new({
@@ -421,7 +422,7 @@ use base qw();
             undef);
         my $defined_local_dir = (defined $local_dir) ? "$local_dir/$TAG" : undef;
 
-        eval("use $config_ref->{scoring_class};");
+        eval { load $config_ref->{scoring_class}; };
         if ($@) {print $@; return;}
 
         my $scoring_ref = $config_ref->{scoring_class}->new({
