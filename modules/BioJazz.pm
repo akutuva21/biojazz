@@ -35,9 +35,6 @@ collect_history_from_genomes
 collect_history_from_logfile
 collect_info_from_networks
 );
-#@EXPORT_OK = qw(
-#		$xxx
-#	    );
 
 #######################################################################################
 # MODULES USED
