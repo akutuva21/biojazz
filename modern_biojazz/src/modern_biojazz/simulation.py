@@ -38,9 +38,11 @@ class SimulationBackend(Protocol):
     def simulate(
         self,
         network: ReactionNetwork,
-        config: SimulationConfig,
-    ) -> Dict[str, Any]:
-        ...
+        t_end: float,
+        dt: float,
+        solver: str,
+        initial_conditions: Dict[str, float] | None = None,
+    ) -> Dict[str, Any]: ...
 
 
 class FitnessScorer(Protocol):
@@ -51,8 +53,7 @@ class FitnessScorer(Protocol):
         backend: SimulationBackend | None = None,
         network: ReactionNetwork | None = None,
         config: SimulationConfig | None = None,
-    ) -> float:
-        ...
+    ) -> float: ...
 
 
 @dataclass
@@ -93,18 +94,18 @@ class CatalystHTTPClient:
                     time.sleep(0.2 * (attempt + 1))
                     continue
                 break
-        raise RuntimeError(f"Failed to simulate network via Catalyst service: {last_error}") from last_error
+        raise RuntimeError(
+            f"Failed to simulate network via Catalyst service: {last_error}"
+        ) from last_error
 
 
 @dataclass
 class LocalCatalystEngine:
     """Mass-action stepping engine for local integration tests and baseline scoring."""
 
-    def simulate(
-        self,
-        network: ReactionNetwork,
-        config: SimulationConfig,
-    ) -> Dict[str, Any]:
+    def _prepare_initial_state(
+        self, network: ReactionNetwork, initial_conditions: Dict[str, float] | None
+    ) -> tuple[list[str], dict[str, int], list[float]]:
         species_order = list(network.proteins.keys())
         seen = set(species_order)
         for rule in network.rules:
@@ -118,10 +119,12 @@ class LocalCatalystEngine:
         if initial_conditions:
             for name, value in initial_conditions.items():
                 if name not in index:
+                    seen.add(name)
                     species_order.append(name)
                     index[name] = len(y0)
                     y0.append(0.0)
                 y0[index[name]] = float(value)
+        return species_order, index, y0
 
         rates = [max(1e-8, float(r.rate)) for r in network.rules] or [1e-8]
         stiffness_proxy = (max(rates) / min(rates)) > 100.0
@@ -161,11 +164,9 @@ class LocalCatalystEngine:
                     for idx, count in stoich:
                         dydt[idx] += flux * count
             return dydt
+        return rhs
 
-        trajectory = []
-        y_series = None
-        used_solver = config.solver
-
+    def _run_solver(self, rhs: Any, y0: list[float], t_end: float, dt: float, t_eval: list[float], solver: str) -> tuple[list[list[float]], str]:
         solve_ivp = None
         try:
             from scipy.integrate import solve_ivp as _solve_ivp  # type: ignore
@@ -187,8 +188,7 @@ class LocalCatalystEngine:
             )
             if not solved.success or solved.y is None:
                 raise RuntimeError(f"BDF solve failed: {solved.message}")
-            y_series = solved.y
-            used_solver = "BDF"
+            return solved.y, "BDF"
         else:
             # Fallback keeps local execution available when SciPy is not present.
             current = list(y0)
@@ -199,8 +199,10 @@ class LocalCatalystEngine:
                 snapshots.append(list(current))
             # Shape contract for both solver paths: y_series[species_index][time_index].
             y_series = [list(col) for col in zip(*snapshots)]
-            used_solver = "EulerFallback"
+            return y_series, "EulerFallback"
 
+    def _build_trajectory(self, network: ReactionNetwork, species_order: list[str], index: dict[str, int], y_series: list[list[float]], t_eval: list[float]) -> list[Dict[str, Any]]:
+        trajectory = []
         output_species = network.metadata.get("output_species")
         if output_species not in index:
             output_species = species_order[0] if species_order else ""
@@ -217,6 +219,27 @@ class LocalCatalystEngine:
                     "species": LazySpeciesMap(y_series, index, species_order, ti),
                 }
             )
+        return trajectory
+
+    def simulate(
+        self,
+        network: ReactionNetwork,
+        t_end: float,
+        dt: float,
+        solver: str = "FBDF",
+        initial_conditions: Dict[str, float] | None = None,
+    ) -> Dict[str, Any]:
+        species_order, index, y0 = self._prepare_initial_state(network, initial_conditions)
+
+        rates = [max(1e-8, float(r.rate)) for r in network.rules] or [1e-8]
+        stiffness_proxy = (max(rates) / min(rates)) > 100.0
+        t_eval = [i * dt for i in range(int(t_end / dt) + 1)]
+
+        rhs = self._make_rhs(network, index)
+
+        y_series, used_solver = self._run_solver(rhs, y0, t_end, dt, t_eval, solver)
+
+        trajectory = self._build_trajectory(network, species_order, index, y_series, t_eval)
 
         return {
             "solver": used_solver,
@@ -241,12 +264,20 @@ class FitnessEvaluator:
         network: ReactionNetwork | None = None,
         config: SimulationConfig | None = None,
     ) -> float:
+        if config is None:
+            config = SimulationConfig()
         if simulation_result is None:
             if backend is None or network is None:
-                raise ValueError("Either simulation_result or both backend and network must be provided.")
-
-            cfg = config if config is not None else SimulationConfig()
-            simulation_result = backend.simulate(network, config=cfg)
+                raise ValueError(
+                    "Either simulation_result or both backend and network must be provided."
+                )
+            simulation_result = backend.simulate(
+                network,
+                t_end=config.t_end,
+                dt=config.dt,
+                solver=config.solver,
+                initial_conditions=config.initial_conditions,
+            )
 
         trajectory = simulation_result.get("trajectory", [])
         if not trajectory:
@@ -274,23 +305,32 @@ class UltrasensitiveFitnessEvaluator:
         config: SimulationConfig | None = None,
     ) -> float:
         if backend is None or network is None:
-            raise ValueError("UltrasensitiveFitnessEvaluator requires backend and network.")
+            raise ValueError(
+                "UltrasensitiveFitnessEvaluator requires backend and network."
+            )
+        if config is None:
+            config = SimulationConfig(t_end=30.0, dt=0.5)
 
         cfg = config if config is not None else SimulationConfig(t_end=30.0, dt=0.5)
 
         responses = []
         for dose in self.doses:
-            dose_cfg = SimulationConfig(
-                t_end=cfg.t_end,
-                dt=cfg.dt,
-                solver=cfg.solver,
+            result = backend.simulate(
+                network,
+                t_end=config.t_end,
+                dt=config.dt,
+                solver=config.solver,
                 initial_conditions={self.input_species: dose},
             )
             result = backend.simulate(network, config=dose_cfg)
             series = result.get("trajectory", [])
             final = 0.0
             if series:
-                final = float(series[-1].get("species", {}).get(self.output_species, series[-1].get("output", 0.0)))
+                final = float(
+                    series[-1]
+                    .get("species", {})
+                    .get(self.output_species, series[-1].get("output", 0.0))
+                )
             responses.append(max(1e-8, final))
 
         lo = responses[0]
@@ -309,7 +349,9 @@ class UltrasensitiveFitnessEvaluator:
         n_h = math.log10(81.0) / math.log10(d90 / d10)
         return max(0.0, min(10.0, n_h))
 
-    def _interpolate_dose(self, doses: tuple[float, ...], responses: list[float], target: float) -> float | None:
+    def _interpolate_dose(
+        self, doses: tuple[float, ...], responses: list[float], target: float
+    ) -> float | None:
         for i in range(1, len(doses)):
             y0, y1 = responses[i - 1], responses[i]
             if (y0 <= target <= y1) or (y1 <= target <= y0):

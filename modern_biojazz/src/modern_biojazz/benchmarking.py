@@ -40,7 +40,11 @@ def benchmark_backend(
                 simulation_result=sim,
                 backend=backend,
                 network=network,
-                config=cfg,
+                config=SimulationConfig(
+                    t_end=t_end,
+                    dt=dt,
+                    solver=solver,
+                ),
             )
         )
 

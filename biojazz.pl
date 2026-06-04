@@ -54,6 +54,7 @@ use warnings;
 use Getopt::Long;
 use Text::ParseWords;
 use English;			# Use english names for global system variables
+use Text::ParseWords;
 
 use 5.008_000;            # require perl version 5.8.0 or higher
 use Class::Std 0.0.8;     # require Class::Std version 0.0.8 or higher

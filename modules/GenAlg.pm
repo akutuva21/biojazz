@@ -25,6 +25,7 @@ use base qw();
 
     use Globals qw ($verbosity $TAG);
 
+    use Module::Load qw(load);
     use ScorCluster;
     use Generation;
 
@@ -207,7 +208,7 @@ use base qw();
                 eval { load $config_ref->{scoring_class}; };
                 if ($@) {print $@; return;}
 
-                my $scoring_ref = $config_ref->{scoring_class}->new({
+                my $scoring_ref = $scoring_class->new({
                         config_file => $config_ref->{config_file},
                         node_ID => 999,
                         work_dir => "$config_ref->{work_dir}/$TAG",
@@ -305,7 +306,7 @@ use base qw();
                 eval { load $config_ref->{scoring_class}; };
                 if ($@) {print $@; return;}
 
-                my $scoring_ref = $config_ref->{scoring_class}->new({
+                my $scoring_ref = $scoring_class->new({
                         config_file => $config_ref->{config_file},
                         node_ID => 999,
                         work_dir => "$config_ref->{work_dir}/$TAG",
@@ -425,7 +426,7 @@ use base qw();
         eval { load $config_ref->{scoring_class}; };
         if ($@) {print $@; return;}
 
-        my $scoring_ref = $config_ref->{scoring_class}->new({
+        my $scoring_ref = $scoring_class->new({
                 config_file => $config_ref->{config_file},
                 node_ID => 999,
                 work_dir => "$config_ref->{work_dir}/$TAG",
