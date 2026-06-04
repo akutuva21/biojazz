@@ -248,7 +248,10 @@ class GraphMutator:
                 if partner not in bind_sites[0].allowed_partners:
                     bind_sites[0].allowed_partners.append(partner)
 
-    def action_library(self, network: ReactionNetwork) -> Dict[str, MutationAction]:
+    def action_library(self, network: ReactionNetwork | None = None) -> Dict[str, MutationAction]:
+        if hasattr(self, "_action_dict"):
+            return self._action_dict
+
         def random_add_site(net: ReactionNetwork) -> None:
             if not net.proteins:
                 self.add_protein(net)
@@ -356,7 +359,7 @@ class GraphMutator:
             target = self.rng.choice(list(net.proteins.keys()))
             self.remove_protein(net, target)
 
-        return {
+        self._action_dict = {
             "add_site": MutationAction("add_site", random_add_site),
             "add_binding": MutationAction("add_binding", random_bind),
             "add_phosphorylation": MutationAction("add_phosphorylation", random_phos),
@@ -373,3 +376,4 @@ class GraphMutator:
             "add_feedback_loop": MutationAction("add_feedback_loop", random_feedback_loop),
             "add_feedforward_loop": MutationAction("add_feedforward_loop", random_feedforward_loop),
         }
+        return self._action_dict
