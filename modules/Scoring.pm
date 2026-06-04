@@ -295,10 +295,11 @@ use base qw();
 
         printn "facile_run: facile command is " . join(" ", @facile_cmd);
         printn "facile_run: started facile on " . `date`;
-        system(@facile_cmd);
+        system("$facile_cmd");
+        my $facile_status = $?;
         unlink("${file_root}_r.m", "${file_root}_s.m");
-        if ($?) {
-            printn "ERROR: Facile reported an error ($?)";
+        if ($facile_status) {
+            printn "ERROR: Facile reported an error ($facile_status)";
             exit(1);
         }
         printn "facile_run: finished facile on " . `date`;

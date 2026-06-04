@@ -2,7 +2,33 @@ from __future__ import annotations
 
 import builtins
 
-from modern_biojazz.simulation import FitnessEvaluator, LocalCatalystEngine, UltrasensitiveFitnessEvaluator
+import urllib.error
+from unittest.mock import patch
+import pytest
+
+from modern_biojazz.simulation import (
+    FitnessEvaluator,
+    LocalCatalystEngine,
+    UltrasensitiveFitnessEvaluator,
+    CatalystHTTPClient,
+)
+
+
+def test_catalyst_http_client_error_path(seed_network):
+    client = CatalystHTTPClient(base_url="http://fake", retry_count=2)
+
+    with patch("urllib.request.urlopen") as mock_urlopen, patch("time.sleep") as mock_sleep:
+        mock_error = urllib.error.URLError("Connection refused")
+        mock_urlopen.side_effect = mock_error
+
+        with pytest.raises(RuntimeError) as exc_info:
+            client.simulate(seed_network, t_end=10.0, dt=1.0)
+
+        assert "Failed to simulate network via Catalyst service" in str(exc_info.value)
+        # Should attempt 3 times total (1 initial + 2 retries)
+        assert mock_urlopen.call_count == 3
+        # Should sleep 2 times
+        assert mock_sleep.call_count == 2
 
 
 def test_fitness_evaluator_accepts_backend_network(seed_network):
