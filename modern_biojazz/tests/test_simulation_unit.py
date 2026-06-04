@@ -80,7 +80,10 @@ def test_local_engine_euler_fallback_when_scipy_unavailable(seed_network, monkey
 
     monkeypatch.setattr(builtins, "__import__", fake_import)
     engine = LocalCatalystEngine()
-    result = engine.simulate(seed_network, t_end=3.0, dt=1.0, solver="Rodas5P")
+    result = engine.simulate(
+        seed_network,
+        config=SimulationConfig(t_end=3.0, dt=1.0, solver="Rodas5P")
+    )
 
     assert result["solver"] == "EulerFallback"
     assert len(result["trajectory"]) == 4

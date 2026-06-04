@@ -28,9 +28,12 @@ def benchmark_backend(
 ) -> BenchmarkResult:
     durations: List[float] = []
     scores: List[float] = []
+
+    cfg = SimulationConfig(t_end=t_end, dt=dt, solver=solver)
+
     for _ in range(runs):
         start = time.perf_counter()
-        sim = backend.simulate(network, t_end=t_end, dt=dt, solver=solver)
+        sim = backend.simulate(network, config=cfg)
         durations.append(time.perf_counter() - start)
         scores.append(
             evaluator.score(

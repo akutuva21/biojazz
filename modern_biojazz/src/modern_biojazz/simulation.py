@@ -65,17 +65,14 @@ class CatalystHTTPClient:
     def simulate(
         self,
         network: ReactionNetwork,
-        t_end: float,
-        dt: float,
-        solver: str = "FBDF",
-        initial_conditions: Dict[str, float] | None = None,
+        config: SimulationConfig,
     ) -> Dict[str, Any]:
         payload = {
             "network": network.to_dict(),
-            "t_end": t_end,
-            "dt": dt,
-            "solver": solver,
-            "initial_conditions": initial_conditions or {},
+            "t_end": config.t_end,
+            "dt": config.dt,
+            "solver": config.solver,
+            "initial_conditions": config.initial_conditions or {},
         }
         last_error: Exception | None = None
         for attempt in range(self.retry_count + 1):
@@ -131,7 +128,7 @@ class LocalCatalystEngine:
 
         rates = [max(1e-8, float(r.rate)) for r in network.rules] or [1e-8]
         stiffness_proxy = (max(rates) / min(rates)) > 100.0
-        t_eval = [i * dt for i in range(int(t_end / dt) + 1)]
+        t_eval = [i * config.dt for i in range(int(config.t_end / config.dt) + 1)]
 
         compiled_rules = []
         for rule in network.rules:
@@ -181,7 +178,7 @@ class LocalCatalystEngine:
         if solve_ivp is not None:
             solved = solve_ivp(
                 fun=rhs,
-                t_span=(0.0, t_end),
+                t_span=(0.0, config.t_end),
                 y0=y0,
                 method="BDF",
                 t_eval=t_eval,
@@ -198,7 +195,7 @@ class LocalCatalystEngine:
             snapshots = [list(current)]
             for _ in range(1, len(t_eval)):
                 deriv = rhs(0.0, current)
-                current = [max(0.0, c + dt * dc) for c, dc in zip(current, deriv)]
+                current = [max(0.0, c + config.dt * dc) for c, dc in zip(current, deriv)]
                 snapshots.append(list(current))
             # Shape contract for both solver paths: y_series[species_index][time_index].
             y_series = [list(col) for col in zip(*snapshots)]
@@ -314,6 +311,8 @@ class UltrasensitiveFitnessEvaluator:
         if config is None:
             config = SimulationConfig(t_end=30.0, dt=0.5)
 
+        cfg = config if config is not None else SimulationConfig(t_end=30.0, dt=0.5)
+
         responses = []
         for dose in self.doses:
             result = backend.simulate(
@@ -323,6 +322,7 @@ class UltrasensitiveFitnessEvaluator:
                 solver=config.solver,
                 initial_conditions={self.input_species: dose},
             )
+            result = backend.simulate(network, config=dose_cfg)
             series = result.get("trajectory", [])
             final = 0.0
             if series:

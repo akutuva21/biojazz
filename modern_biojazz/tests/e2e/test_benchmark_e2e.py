@@ -7,9 +7,9 @@ from modern_biojazz.simulation import LocalCatalystEngine, FitnessEvaluator
 
 
 class SlowLegacyLikeBackend:
-    def simulate(self, network, t_end, dt, solver):
+    def simulate(self, network, config):
         time.sleep(0.5)
-        return LocalCatalystEngine().simulate(network, t_end, dt, solver)
+        return LocalCatalystEngine().simulate(network, config=config)
 
 
 def test_benchmark_compare_backends_e2e(seed_network):
