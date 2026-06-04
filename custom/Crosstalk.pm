@@ -9,7 +9,7 @@
 #               the network to compute all signals
 #
 #        FILES: Scoring.pm, Stimulus.pm, MatlabDriver.pm, GenomeModel.pm
-#         BUGS: Newly created
+#         BUGS: ---
 #        NOTES: Need to implement different types of signaling dynamics: adaptation
 #               , ultrasensitivity, (damped) oscillation?
 #               Ideally, if we could associate the dynamics with real biological
