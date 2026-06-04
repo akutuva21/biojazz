@@ -18,6 +18,8 @@ class GraphMutator:
 
     def __init__(self, rng: random.Random | None = None) -> None:
         self.rng = rng or random.Random()
+        self._rule_counter = 0
+        self._protein_counter = 0
 
     def _add_species_if_missing(self, network: ReactionNetwork, species_name: str) -> None:
         if species_name not in network.proteins:
@@ -51,7 +53,12 @@ class GraphMutator:
         return False
 
     def add_protein(self, network: ReactionNetwork, protein_name: str | None = None) -> None:
-        protein_name = protein_name or f"P{len(network.proteins) + 1}"
+        if not protein_name:
+            self._protein_counter += 1
+            protein_name = f"P{self._protein_counter}"
+            while protein_name in network.proteins:
+                self._protein_counter += 1
+                protein_name = f"P{self._protein_counter}"
         if protein_name in network.proteins:
             return
         network.proteins[protein_name] = Protein(name=protein_name, sites=[])
@@ -85,7 +92,8 @@ class GraphMutator:
             return
         if not self._binding_is_compatible(network, a, b):
             return
-        rname = f"bind_{a}_{b}_{len(network.rules)+1}"
+        self._rule_counter += 1
+        rname = f"bind_{a}_{b}_{self._rule_counter}"
         complex_species = f"{a}:{b}"
         self._add_species_if_missing(network, complex_species)
         network.rules.append(
@@ -95,7 +103,8 @@ class GraphMutator:
     def add_phosphorylation_rule(self, network: ReactionNetwork, kinase: str, substrate: str, rate: float = 0.2) -> None:
         if kinase not in network.proteins or substrate not in network.proteins:
             return
-        rname = f"phos_{kinase}_{substrate}_{len(network.rules)+1}"
+        self._rule_counter += 1
+        rname = f"phos_{kinase}_{substrate}_{self._rule_counter}"
         phospho = f"{substrate}_P"
         self._add_species_if_missing(network, phospho)
         network.rules.append(
@@ -112,7 +121,8 @@ class GraphMutator:
     def add_dephosphorylation_rule(self, network: ReactionNetwork, phosphatase: str, substrate: str, rate: float = 0.2) -> None:
         if phosphatase not in network.proteins or substrate not in network.proteins:
             return
-        rname = f"dephos_{phosphatase}_{substrate}_{len(network.rules)+1}"
+        self._rule_counter += 1
+        rname = f"dephos_{phosphatase}_{substrate}_{self._rule_counter}"
         phospho = f"{substrate}_P"
         self._add_species_if_missing(network, phospho)
         network.rules.append(
@@ -128,7 +138,8 @@ class GraphMutator:
     def add_activation_rule(self, network: ReactionNetwork, activator: str, target: str, rate: float = 0.2) -> None:
         if activator not in network.proteins or target not in network.proteins:
             return
-        rname = f"act_{activator}_{target}_{len(network.rules)+1}"
+        self._rule_counter += 1
+        rname = f"act_{activator}_{target}_{self._rule_counter}"
         activated = f"{target}_act"
         self._add_species_if_missing(network, activated)
         network.rules.append(
@@ -144,7 +155,8 @@ class GraphMutator:
     def add_synthesis_rule(self, network: ReactionNetwork, protein: str, rate: float = 0.1) -> None:
         if protein not in network.proteins:
             return
-        rname = f"syn_{protein}_{len(network.rules)+1}"
+        self._rule_counter += 1
+        rname = f"syn_{protein}_{self._rule_counter}"
         self._add_species_if_missing(network, protein)
         network.rules.append(
             Rule(
@@ -159,7 +171,8 @@ class GraphMutator:
     def add_degradation_rule(self, network: ReactionNetwork, protein: str, rate: float = 0.1) -> None:
         if protein not in network.proteins:
             return
-        rname = f"deg_{protein}_{len(network.rules)+1}"
+        self._rule_counter += 1
+        rname = f"deg_{protein}_{self._rule_counter}"
         self._add_species_if_missing(network, protein)
         network.rules.append(
             Rule(
@@ -173,7 +186,8 @@ class GraphMutator:
     def add_inhibition_rule(self, network: ReactionNetwork, inhibitor: str, target: str, rate: float = 0.05) -> None:
         if inhibitor not in network.proteins or target not in network.proteins:
             return
-        rname = f"inh_{inhibitor}_{target}_{len(network.rules)+1}"
+        self._rule_counter += 1
+        rname = f"inh_{inhibitor}_{target}_{self._rule_counter}"
         inhibited = f"{target}_inh"
         self._add_species_if_missing(network, inhibited)
         network.rules.append(
