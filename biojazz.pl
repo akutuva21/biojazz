@@ -52,6 +52,7 @@ use warnings;
 # STANDARD PACKAGES
 #######################################################################################
 use Getopt::Long;
+use Text::ParseWords;
 use English;			# Use english names for global system variables
 use Text::ParseWords;
 
@@ -199,38 +200,40 @@ rescore_genomes() if $RESCORE && defined $config_ref->{config_file};
 
 
 if (defined $COMMAND) {
-    my %allowlist = map { $_ => 1 } qw(
-        create_workspace evolve load_genome save_genome score_genome
-        score_generation rescore_genomes collect_history_from_genomes
-        collect_history_from_logfile collect_info_from_networks
+    my %allowed_cmds = map { $_ => 1 } qw(
+        create_workspace
+        evolve
+        load_genome
+        save_genome
+        score_genome
+        score_generation
+        rescore_genomes
+        collect_history_from_genomes
+        collect_history_from_logfile
+        collect_info_from_networks
     );
 
-    if ($COMMAND =~ /^(\w+)(?:\s*\((.*)\))?$/) {
+    if ($COMMAND =~ /^\s*([a-zA-Z0-9_]+)\s*(?:\((.*)\))?\s*;?\s*$/) {
         my $func = $1;
         my $args_str = $2;
 
-        if ($allowlist{$func}) {
-            my @args;
-            if (defined $args_str && $args_str !~ /^\s*$/) {
-                @args = quotewords('\s*(?:,|=>)\s*', 0, $args_str);
+        if ($allowed_cmds{$func}) {
+            my @args = ();
+            if (defined $args_str && $args_str =~ /\S/) {
+                $args_str =~ s/=>/,/g;
+                @args = Text::ParseWords::parse_line('\s*,\s*', 0, $args_str);
             }
-
-            # Strip any trailing/leading whitespace and quotes from args
-            foreach my $arg (@args) {
-                next unless defined $arg;
-                $arg =~ s/^\s+//;
-                $arg =~ s/\s+$//;
-                $arg =~ s/^['"](.*)['"]$/$1/;
-            }
-
             no strict 'refs';
-            eval { &{"main::$func"}(@args) };
-            warn $@ if $@;
+            if (defined &$func) {
+                &{$func}(@args);
+            } else {
+                warn "Error: Command '$func' is not implemented.\n";
+            }
         } else {
-            warn "Security Error: Function '$func' is not permitted for execution.\n";
+            warn "Error: Command '$func' is not permitted for security reasons.\n";
         }
     } else {
-        warn "Security Error: Invalid command format: $COMMAND\n";
+        warn "Error: Invalid command format. Only function calls are permitted.\n";
     }
 }
 
