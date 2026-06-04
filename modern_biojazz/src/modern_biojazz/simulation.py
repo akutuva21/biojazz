@@ -2,12 +2,36 @@ from __future__ import annotations
 
 import json
 import math
+import ssl
 import time
 import urllib.request
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any, Dict, Protocol
 
 from .site_graph import ReactionNetwork
+
+
+class LazySpeciesMap(Mapping):
+    __slots__ = ("_y_series", "_index", "_species_order", "_ti")
+
+    def __init__(self, y_series: list[list[float]], index: dict[str, int], species_order: list[str], ti: int):
+        self._y_series = y_series
+        self._index = index
+        self._species_order = species_order
+        self._ti = ti
+
+    def __getitem__(self, key: str) -> float:
+        idx = self._index.get(key)
+        if idx is not None:
+            return max(0.0, float(self._y_series[idx][self._ti]))
+        raise KeyError(key)
+
+    def __iter__(self):
+        return iter(self._species_order)
+
+    def __len__(self) -> int:
+        return len(self._species_order)
 
 
 class SimulationBackend(Protocol):
@@ -65,9 +89,7 @@ class CatalystHTTPClient:
                     headers={"Content-Type": "application/json"},
                     method="POST",
                 )
-                with urllib.request.urlopen(
-                    req, timeout=self.timeout_seconds
-                ) as response:
+                with urllib.request.urlopen(req, timeout=self.timeout_seconds, context=ssl.create_default_context()) as response:
                     status = getattr(response, "status", 200)
                     if status >= 400:
                         raise RuntimeError(f"Catalyst service returned HTTP {status}")
@@ -96,16 +118,15 @@ class LocalCatalystEngine:
         initial_conditions: Dict[str, float] | None = None,
     ) -> Dict[str, Any]:
         species_order = list(network.proteins.keys())
+        seen = set(species_order)
         for rule in network.rules:
             for token in [*rule.reactants, *rule.products]:
-                if token not in species_order:
+                if token not in seen:
+                    seen.add(token)
                     species_order.append(token)
 
         index = {name: i for i, name in enumerate(species_order)}
-        y0 = [1.0 for _ in species_order]
-        for i, name in enumerate(species_order):
-            if name not in network.proteins:
-                y0[i] = 0.0
+        y0 = [1.0 if name in network.proteins else 0.0 for name in species_order]
         if initial_conditions:
             for name, value in initial_conditions.items():
                 if name not in index:
@@ -120,35 +141,37 @@ class LocalCatalystEngine:
 
         compiled_rules = []
         for rule in network.rules:
-            net_change: dict[int, float] = {}
-            for r in rule.reactants:
-                idx = index[r]
-                net_change[idx] = net_change.get(idx, 0.0) - 1.0
-            for p in rule.products:
-                idx = index[p]
-                net_change[idx] = net_change.get(idx, 0.0) + 1.0
+            r_indices = [index[r] for r in rule.reactants]
+            p_indices = [index[p] for p in rule.products]
+            rate = max(0.0, float(rule.rate))
 
-            compiled_rules.append(
-                (
-                    max(0.0, float(rule.rate)),
-                    [index[r] for r in rule.reactants],
-                    [
-                        (idx, change)
-                        for idx, change in net_change.items()
-                        if change != 0.0
-                    ],
-                )
-            )
+            # Combine net stoich changes
+            net_stoich = {}
+            for r in r_indices:
+                net_stoich[r] = net_stoich.get(r, 0) - 1
+            for p in p_indices:
+                net_stoich[p] = net_stoich.get(p, 0) + 1
+
+            compiled_rules.append((
+                rate,
+                tuple(r_indices),
+                tuple((idx, count) for idx, count in net_stoich.items() if count != 0)
+            ))
 
         def rhs(_t: float, y: list[float]) -> list[float]:
             dydt = [0.0] * len(y)
-            for rate, r_indices, net_changes in compiled_rules:
+            for rate, r_indices, stoich in compiled_rules:
                 flux = rate
                 for r_idx in r_indices:
-                    flux *= max(0.0, y[r_idx])
+                    v = y[r_idx]
+                    if v <= 0.0:
+                        flux = 0.0
+                        break
+                    flux *= v
+
                 if flux > 0.0:
-                    for idx, change in net_changes:
-                        dydt[idx] += flux * change
+                    for idx, count in stoich:
+                        dydt[idx] += flux * count
             return dydt
 
         trajectory = []
@@ -194,16 +217,16 @@ class LocalCatalystEngine:
         if output_species not in index:
             output_species = species_order[0] if species_order else ""
 
+        output_idx = index.get(output_species)
+
         for ti, tval in enumerate(t_eval):
-            species_map = {
-                name: max(0.0, float(y_series[index[name]][ti]))
-                for name in species_order
-            }
+            output_val = max(0.0, float(y_series[output_idx][ti])) if output_idx is not None else 0.0
+
             trajectory.append(
                 {
                     "t": tval,
-                    "output": species_map.get(output_species, 0.0),
-                    "species": species_map,
+                    "output": output_val,
+                    "species": LazySpeciesMap(y_series, index, species_order, ti),
                 }
             )
 

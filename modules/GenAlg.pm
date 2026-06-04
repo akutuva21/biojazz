@@ -35,6 +35,7 @@ use base qw();
 
 
     use FindBin qw($Bin);  # need application path
+    use Module::Load;
 
     #######################################################################################
     # CLASS ATTRIBUTES
@@ -203,7 +204,7 @@ use base qw();
                     undef);
                 my $defined_local_dir = (defined $local_dir) ? "$local_dir/$TAG" : undef;
 
-                eval("use $config_ref->{scoring_class};");
+                eval { load $config_ref->{scoring_class}; };
                 if ($@) {print $@; return;}
 
                 my $scoring_ref = $config_ref->{scoring_class}->new({
@@ -301,7 +302,7 @@ use base qw();
                     undef);
                 my $defined_local_dir = (defined $local_dir) ? "$local_dir/$TAG" : undef;
 
-                eval("use $config_ref->{scoring_class};");
+                eval { load $config_ref->{scoring_class}; };
                 if ($@) {print $@; return;}
 
                 my $scoring_ref = $config_ref->{scoring_class}->new({
@@ -421,7 +422,7 @@ use base qw();
             undef);
         my $defined_local_dir = (defined $local_dir) ? "$local_dir/$TAG" : undef;
 
-        eval("use $config_ref->{scoring_class};");
+        eval { load $config_ref->{scoring_class}; };
         if ($@) {print $@; return;}
 
         my $scoring_ref = $config_ref->{scoring_class}->new({
@@ -442,10 +443,10 @@ use base qw();
             my $parent_name = $parent_ref->get_name();
 
             # start the kimura selection (random walk)
-            my $fixation_p = -1;
+            my $fixation_p;
             my $mutated_score;
             my $mutation_step_num = 0;
-            while ($fixation_p < rand) {
+            while (1) {
 
                 $current_generation_ref->clear_genomes();
                 $current_generation_ref->load_generation(
@@ -493,6 +494,14 @@ use base qw();
 
                 $fixation_p *= $amplifier_alpha;
                 $mutation_step_num++;
+
+                if (rand() <= $fixation_p) {
+                    my $child_ref = $parent_ref->duplicate();
+                    $child_ref->set_number($mutation_step_num);
+                    $next_generation_ref->add_element($child_ref);
+                    last;
+                }
+
                 if ($max_mutate_attempts > 0 && $mutation_step_num > $max_mutate_attempts) {
                     my $child_ref = $parent_ref->duplicate();
                     $child_ref->set_number($mutation_step_num);
@@ -509,11 +518,6 @@ use base qw();
                     exit(1);
                 }
             }
-
-            # after fix the mutation
-            my $child_ref = $parent_ref->duplicate();
-            $child_ref->set_number($mutation_step_num);
-            $next_generation_ref->add_element($child_ref);
         }
 
 
